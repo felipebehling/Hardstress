@@ -1,39 +1,57 @@
 # Makefile para HardStress
 # Uso:
-#   make          -> build padrão
+#   make          -> build padrão no diretório raiz
 #   make clean    -> limpar
 #   make release  -> otimizado para release
 
+# Detecta a plataforma para adicionar a extensão correta ao executável
 TARGET = HardStress
-SRC = hardstress.c
+ifeq ($(OS),Windows_NT)
+    TARGET_EXT = .exe
+else
+    TARGET_EXT =
+endif
 
+# Localização dos fontes
+SRC_DIR = src
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+OBJS = $(SRCS:.c=.o)
+
+# Ferramentas e libs
 PKG_CONFIG ?= pkg-config
 GTK_CFLAGS := $(shell $(PKG_CONFIG) --cflags gtk+-3.0)
 GTK_LIBS   := $(shell $(PKG_CONFIG) --libs gtk+-3.0)
 
-# Define CFLAGS e LDFLAGS com base no SO
+# Flags de compilação e linkagem por plataforma
 ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
-    # Adicionado -lole32, -lwbemuuid para WMI e -lpdh para PDH
-    CFLAGS = -O2 -Wall -std=gnu11 $(GTK_CFLAGS) -D_WIN32_DCOM
+    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -D_WIN32_DCOM -I$(SRC_DIR)
     LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid
 else
     # Linux/Outros
-    CFLAGS = -O2 -Wall -std=gnu11 $(GTK_CFLAGS)
+    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
     LDFLAGS = $(GTK_LIBS) -lpthread -lm
 endif
 
-all: $(TARGET)
+# Flags específicas para cada tipo de build
+CFLAGS_DEBUG = -O2 -g
+CFLAGS_RELEASE = -O3 -march=native -DNDEBUG
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+# Define o CFLAGS padrão como debug
+CFLAGS ?= $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
+
+.PHONY: all clean release
+
+all: $(TARGET)$(TARGET_EXT)
+
+$(TARGET)$(TARGET_EXT): $(OBJS)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	$(RM) $(TARGET) *.o
+	$(RM) $(TARGET)$(TARGET_EXT) $(SRC_DIR)/*.o
 
-release: clean
-ifeq ($(OS),Windows_NT)
-	$(CC) -O3 -march=native -DNDEBUG -Wall -std=gnu11 $(GTK_CFLAGS) -D_WIN32_DCOM -o $(TARGET) $(SRC) $(LDFLAGS)
-else
-	$(CC) -O3 -march=native -DNDEBUG -Wall -std=gnu11 $(GTK_CFLAGS) -o $(TARGET) $(SRC) $(LDFLAGS)
-endif
+release:
+	$(MAKE) all CFLAGS="$(CFLAGS_COMMON) $(CFLAGS_RELEASE)"
