@@ -28,6 +28,7 @@
 #define CPU_SAMPLE_INTERVAL_MS 500
 #define HISTORY_SAMPLES 240 /* 240 * 0.5s = 120s */
 #define ITER_SCALE 1000.0 /* scale factor for iteration chart */
+#define TEMP_UNAVAILABLE -274.0 // Valor para indicar temperatura indisponível
 
 const double COLOR_BG_R = 0.12, COLOR_BG_G = 0.12, COLOR_BG_B = 0.12;
 const double COLOR_FG_R = 0.15, COLOR_FG_G = 0.65, COLOR_FG_B = 0.90;
@@ -111,7 +112,6 @@ static double now_sec(void){
 
 static void gui_log(AppContext *app, const char *fmt, ...){
     va_list ap; va_start(ap, fmt);
-    // CORREÇÃO 1: Usar g_strdup_vprintf em vez de g_vasprintf
     char *s = g_strdup_vprintf(fmt, ap);
     va_end(ap);
     if (!s) return;
@@ -330,9 +330,9 @@ static void sample_cpu_windows(AppContext *app){
 #ifndef _WIN32
 static void sample_temp_linux(AppContext *app){
     FILE *p = popen("sensors -u 2>/dev/null", "r");
-    if (!p){ g_mutex_lock(&app->temp_mutex); app->temp_celsius = -1.0; g_mutex_unlock(&app->temp_mutex); return; }
+    if (!p){ g_mutex_lock(&app->temp_mutex); app->temp_celsius = TEMP_UNAVAILABLE; g_mutex_unlock(&app->temp_mutex); return; }
     char line[256];
-    double found = -1.0;
+    double found = TEMP_UNAVAILABLE;
     while (fgets(line, sizeof(line), p)){
         char *k = strstr(line, "_input:");
         if (k){
@@ -347,17 +347,29 @@ static void sample_temp_linux(AppContext *app){
     g_mutex_lock(&app->temp_mutex); app->temp_celsius = found; g_mutex_unlock(&app->temp_mutex);
 }
 #else
+// ***** INÍCIO DA CORREÇÃO *****
 static void sample_temp_windows(AppContext *app){
-    FILE *p = _popen("powershell -Command \"try { Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root\\wmi | Select-Object -ExpandProperty CurrentTemperature -First 1 } catch {}\" 2> $null", "r");
-    if (!p){ g_mutex_lock(&app->temp_mutex); app->temp_celsius = -1.0; g_mutex_unlock(&app->temp_mutex); return; }
-    char buf[128]; double found = -1.0;
-    if (fgets(buf, sizeof(buf), p)){
-        double raw = atof(buf);
-        if (raw > 0) found = (raw/10.0) - 273.15;
+    const char* command = "powershell -Command \"try { Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root\\wmi | Select-Object -ExpandProperty CurrentTemperature -First 1 } catch {}\"";
+    
+    FILE *p = _popen(command, "r");
+    double found = TEMP_UNAVAILABLE;
+
+    if (p) {
+        char buf[128];
+        if (fgets(buf, sizeof(buf), p)) {
+            double raw = atof(buf);
+            if (raw > 0) {
+                found = (raw / 10.0) - 273.15;
+            }
+        }
+        _pclose(p);
     }
-    _pclose(p);
-    g_mutex_lock(&app->temp_mutex); app->temp_celsius = found; g_mutex_unlock(&app->temp_mutex);
+    
+    g_mutex_lock(&app->temp_mutex);
+    app->temp_celsius = found;
+    g_mutex_unlock(&app->temp_mutex);
 }
+// ***** FIM DA CORREÇÃO *****
 #endif
 
 /* CPU sampler thread */
@@ -412,7 +424,8 @@ static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
     g_mutex_lock(&app->temp_mutex);
     double temp = app->temp_celsius;
     g_mutex_unlock(&app->temp_mutex);
-    if (temp > -200){
+    // Só exibe a temperatura se for um valor válido
+    if (temp > TEMP_UNAVAILABLE){
         char tbuf[64]; snprintf(tbuf, sizeof(tbuf), "Temp: %.2f C", temp);
         cairo_set_source_rgb(cr, 1,1,0.8);
         cairo_move_to(cr, 6, h - 6);
@@ -559,7 +572,6 @@ static void controller_thread_func(void *arg){
     app->worker_threads = calloc(app->threads, sizeof(pthread_t));
 #endif
     for (int i=0;i<app->threads;i++){
-        // CORREÇÃO 2: Removido o membro inexistente 'mem_mib_per_thread'
         app->workers[i] = (worker_t){ .tid = i, .app = app };
         app->workers[i].buf_bytes = app->mem_mib_per_thread * 1024ULL * 1024ULL;
     }
@@ -610,8 +622,8 @@ static void controller_thread_func(void *arg){
         pthread_join(app->worker_threads[i], NULL);
 #endif
     }
+    atomic_store(&app->running, 0);
 #ifdef _WIN32
-    atomic_store(&app->running, 0); // Garante que o sampler pare
     if(app->cpu_sampler_handle) { WaitForSingleObject(app->cpu_sampler_handle, INFINITE); CloseHandle(app->cpu_sampler_handle); }
 #else
     pthread_join(app->cpu_sampler_thread, NULL);
@@ -726,7 +738,7 @@ int main(int argc, char **argv){
     app->duration_sec = DEFAULT_DURATION_SEC;
     app->pin_affinity = 1;
     app->history_len = HISTORY_SAMPLES;
-    app->temp_celsius = -274.0;
+    app->temp_celsius = TEMP_UNAVAILABLE;
 
     app->win = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_default_size(GTK_WINDOW(app->win), 1000, 800);
