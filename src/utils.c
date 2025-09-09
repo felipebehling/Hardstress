@@ -1,6 +1,6 @@
 #include "utils.h"
-#include <process.h>
 
+// Funções que não dependem do sistema operacional
 double now_sec(void){
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec*1e-9;
@@ -22,8 +22,12 @@ void shuffle32(uint32_t *a, size_t n, uint64_t *seed){
 }
 
 
-/* --- Thread Abstraction Implementation --- */
+/* --- Implementação da Abstração de Threads --- */
+
 #ifdef _WIN32
+// MODIFICADO: O include foi movido para dentro deste bloco #ifdef
+#include <process.h> 
+
 int thread_create(thread_handle_t *t, thread_func_t func, void *arg) {
     *t = (HANDLE)_beginthreadex(NULL, 0, func, arg, 0, NULL);
     return (*t == NULL) ? -1 : 0;
@@ -36,11 +40,11 @@ int thread_join(thread_handle_t t) {
     return 0;
 }
 int thread_detach(thread_handle_t t) {
-    // Detaching é implícito com _beginthreadex, apenas fechamos o handle para evitar leaks.
     if(t) CloseHandle(t); 
     return 0;
 }
 #else
+// Código específico para Linux e outros sistemas POSIX (não modificado)
 int thread_create(thread_handle_t *t, thread_func_t func, void *arg) {
     return pthread_create(t, NULL, func, arg);
 }
