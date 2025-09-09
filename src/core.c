@@ -124,7 +124,7 @@ static void worker_main(void *arg){
     uint64_t seed = 0x12340000 + (uint64_t)w->tid;
 
     if (app->kernel_fpu_en && w->buf) {
-        // MODIFICADO: A condição do loop foi alterada de 'floats' para 'floats / 3'
+        // Correção anterior (correta)
         for (size_t i=0; i < (floats / 3); i++){
             A[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
             B[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
@@ -155,7 +155,8 @@ static void worker_main(void *arg){
 
     while (atomic_load(&w->running) && atomic_load(&app->running)){
         if (w->buf) {
-            if(app->kernel_fpu_en) kernel_fpu(A,B,C,floats,4);
+            // MODIFICADO: Passa o tamanho correto (floats / 3) para o kernel
+            if(app->kernel_fpu_en) kernel_fpu(A,B,C, (floats / 3), 4);
             if(app->kernel_int_en) kernel_int(I64, (w->buf_bytes / sizeof(uint64_t)) > 1024 ? 1024 : (w->buf_bytes / sizeof(uint64_t)), 4);
             if(app->kernel_stream_en) kernel_stream(w->buf, w->buf_bytes);
             if(app->kernel_ptr_en && w->idx) kernel_ptrchase(w->idx, w->idx_len, 4);
