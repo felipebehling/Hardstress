@@ -15,7 +15,6 @@ static gboolean ui_tick(gpointer ud);
 static void set_controls_sensitive(AppContext *app, gboolean state);
 static void export_csv_dialog(AppContext *app);
 static gboolean gui_update_started(gpointer ud);
-// A linha abaixo foi modificada para ser acessível externamente
 gboolean gui_update_stopped(gpointer ud);
 
 /* --- Implementações --- */
@@ -24,7 +23,6 @@ static void on_window_destroy(GtkWidget *w, gpointer ud) {
     (void)w;
     AppContext *app = (AppContext*)ud;
 
-    // Limpeza que antes estava em main.c
     if (atomic_load(&app->running)) {
         atomic_store(&app->running, 0);
     }
@@ -32,8 +30,7 @@ static void on_window_destroy(GtkWidget *w, gpointer ud) {
     g_mutex_clear(&app->history_mutex);
     g_mutex_clear(&app->temp_mutex);
     free(app);
-    
-    // Finaliza o loop do GTK
+
     gtk_main_quit();
 }
 
@@ -88,7 +85,7 @@ static void on_btn_start_clicked(GtkButton *b, gpointer ud){
     app->kernel_stream_en = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_stream));
     app->kernel_ptr_en = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ptr));
     app->csv_realtime_en = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_csv_realtime));
-    
+
     if (!app->kernel_fpu_en && !app->kernel_int_en && !app->kernel_stream_en && !app->kernel_ptr_en) {
         gui_log(app, "[GUI] ERRO: Pelo menos um kernel de stress deve ser selecionado.\n");
         return;
@@ -122,17 +119,16 @@ static gboolean on_window_delete(GtkWidget *w, GdkEvent *e, gpointer ud){
         atomic_store(&app->running, 0);
         struct timespec r = {1, 500000000}; nanosleep(&r,NULL);
     }
-    return FALSE; // Permite que a janela feche
+    return FALSE;
 }
 
 static gboolean ui_tick(gpointer ud){
     AppContext *app = (AppContext*)ud;
     if (!atomic_load(&app->running)) {
-        // Redundante com gui_update_stopped mas garante o estado final
         if (strcmp(gtk_label_get_text(GTK_LABEL(app->status_label)), "Parado") != 0) {
             gtk_label_set_text(GTK_LABEL(app->status_label), "Parado");
         }
-        return TRUE; // Mantém o timer rodando
+        return TRUE;
     }
     static unsigned long long last_total = 0;
     unsigned long long cur = atomic_load(&app->total_iters);
@@ -146,34 +142,37 @@ static gboolean ui_tick(gpointer ud){
 
 GtkWidget* create_main_window(AppContext *app) {
     GtkWidget *win = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_default_size(GTK_WINDOW(win), 1000, 800);
-    gtk_window_set_title(GTK_WINDOW(win), "HardStress GUI - Complete");
+    gtk_window_set_default_size(GTK_WINDOW(win), 1200, 800);
+    gtk_window_set_title(GTK_WINDOW(win), "HardStress GUI");
 
-    GtkWidget *grid = gtk_grid_new();
-    gtk_container_add(GTK_CONTAINER(win), grid);
-    gtk_grid_set_row_spacing(GTK_GRID(grid), 6);
-    gtk_grid_set_column_spacing(GTK_GRID(grid), 6);
-    gtk_container_set_border_width(GTK_CONTAINER(grid), 8);
+    GtkWidget *paned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_container_add(GTK_CONTAINER(win), paned);
+    gtk_paned_set_position(GTK_PANED(paned), 280);
+
+    // PAINEL ESQUERDO
+    GtkWidget *left_grid = gtk_grid_new();
+    gtk_grid_set_row_spacing(GTK_GRID(left_grid), 6);
+    gtk_grid_set_column_spacing(GTK_GRID(left_grid), 6);
+    gtk_container_set_border_width(GTK_CONTAINER(left_grid), 10);
+    gtk_paned_pack1(GTK_PANED(paned), left_grid, FALSE, FALSE);
 
     int row = 0;
-    // --- Basic Config ---
-    gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Threads (0=auto):"), 0, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(left_grid), gtk_label_new("Threads (0=auto):"), 0, row, 1, 1);
     app->entry_threads = gtk_entry_new(); gtk_entry_set_text(GTK_ENTRY(app->entry_threads), "0");
-    gtk_grid_attach(GTK_GRID(grid), app->entry_threads, 1, row++, 1, 1);
+    gtk_grid_attach(GTK_GRID(left_grid), app->entry_threads, 1, row++, 1, 1);
 
-    gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Mem (MiB/thread):"), 0, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(left_grid), gtk_label_new("Mem (MiB/thread):"), 0, row, 1, 1);
     app->entry_mem = gtk_entry_new();
     char mem_buf[32]; snprintf(mem_buf, sizeof(mem_buf), "%zu", app->mem_mib_per_thread);
     gtk_entry_set_text(GTK_ENTRY(app->entry_mem), mem_buf);
-    gtk_grid_attach(GTK_GRID(grid), app->entry_mem, 1, row++, 1, 1);
+    gtk_grid_attach(GTK_GRID(left_grid), app->entry_mem, 1, row++, 1, 1);
 
-    gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Duração (s, 0=inf):"), 0, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(left_grid), gtk_label_new("Duração (s, 0=inf):"), 0, row, 1, 1);
     app->entry_dur = gtk_entry_new();
     char dur_buf[32]; snprintf(dur_buf, sizeof(dur_buf), "%d", app->duration_sec);
     gtk_entry_set_text(GTK_ENTRY(app->entry_dur), dur_buf);
-    gtk_grid_attach(GTK_GRID(grid), app->entry_dur, 1, row++, 1, 1);
+    gtk_grid_attach(GTK_GRID(left_grid), app->entry_dur, 1, row++, 1, 1);
 
-    // --- Kernels ---
     GtkWidget *kernel_frame = gtk_frame_new("Kernels de Stress");
     GtkWidget *kernel_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     gtk_container_add(GTK_CONTAINER(kernel_frame), kernel_box);
@@ -189,47 +188,52 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_box_pack_start(GTK_BOX(kernel_box), app->check_int, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(kernel_box), app->check_stream, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(kernel_box), app->check_ptr, FALSE, FALSE, 0);
-    gtk_grid_attach(GTK_GRID(grid), kernel_frame, 0, row++, 2, 1);
+    gtk_grid_attach(GTK_GRID(left_grid), kernel_frame, 0, row++, 2, 1);
 
-
-    app->check_pin = gtk_check_button_new_with_label("Pin threads to CPUs");
+    app->check_pin = gtk_check_button_new_with_label("Fixar threads em CPUs");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_pin), TRUE);
-    gtk_grid_attach(GTK_GRID(grid), app->check_pin, 0, row++, 2, 1);
-    
+    gtk_grid_attach(GTK_GRID(left_grid), app->check_pin, 0, row++, 2, 1);
+
     app->check_csv_realtime = gtk_check_button_new_with_label("Log CSV em tempo real");
-    gtk_grid_attach(GTK_GRID(grid), app->check_csv_realtime, 0, row++, 2, 1);
+    gtk_grid_attach(GTK_GRID(left_grid), app->check_csv_realtime, 0, row++, 2, 1);
 
-    // --- Controls ---
     app->btn_start = gtk_button_new_with_label("Start");
-    app->btn_stop = gtk_button_new_with_label("Stop"); gtk_widget_set_sensitive(app->btn_stop, FALSE);
-    gtk_grid_attach(GTK_GRID(grid), app->btn_start, 0, row, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), app->btn_stop, 1, row++, 1, 1);
+    app->btn_stop = gtk_button_new_with_label("Stop");
+    gtk_widget_set_sensitive(app->btn_stop, FALSE);
 
-    app->btn_export = gtk_button_new_with_label("Export CSV (Em Memoria)");
-    gtk_grid_attach(GTK_GRID(grid), app->btn_export, 0, row++, 2, 1);
+    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_box_pack_start(GTK_BOX(button_box), app->btn_start, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(button_box), app->btn_stop, TRUE, TRUE, 0);
+    gtk_grid_attach(GTK_GRID(left_grid), button_box, 0, row++, 2, 1);
 
-    app->status_label = gtk_label_new("idle");
-    gtk_grid_attach(GTK_GRID(grid), app->status_label, 0, row++, 2, 1);
+    app->btn_export = gtk_button_new_with_label("Exportar CSV (Snapshot)");
+    gtk_grid_attach(GTK_GRID(left_grid), app->btn_export, 0, row++, 2, 1);
 
-    // --- Drawings ---
+    app->status_label = gtk_label_new("Pronto");
+    gtk_grid_attach(GTK_GRID(left_grid), app->status_label, 0, row++, 2, 1);
+
+    // PAINEL DIREITO
+    GtkWidget *right_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    gtk_container_set_border_width(GTK_CONTAINER(right_box), 10);
+    gtk_paned_pack2(GTK_PANED(paned), right_box, TRUE, TRUE);
+
     app->cpu_drawing = gtk_drawing_area_new();
-    gtk_widget_set_size_request(app->cpu_drawing, 0, 100);
-    gtk_grid_attach(GTK_GRID(grid), app->cpu_drawing, 0, row++, 2, 1);
+    gtk_widget_set_size_request(app->cpu_drawing, -1, 100);
+    gtk_box_pack_start(GTK_BOX(right_box), app->cpu_drawing, FALSE, FALSE, 0);
 
     app->iters_drawing = gtk_drawing_area_new();
-    gtk_widget_set_size_request(app->iters_drawing, 0, 200);
-    gtk_grid_attach(GTK_GRID(grid), app->iters_drawing, 0, row++, 2, 1);
+    gtk_widget_set_size_request(app->iters_drawing, -1, 200);
+    gtk_box_pack_start(GTK_BOX(right_box), app->iters_drawing, FALSE, FALSE, 0);
 
-    // --- Log ---
-    GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL); gtk_widget_set_vexpand(scrolled, TRUE);
-    gtk_grid_attach(GTK_GRID(grid), scrolled, 0, row++, 2, 1);
-    // CÓDIGO RESTAURADO A PARTIR DAQUI
-    GtkWidget *text = gtk_text_view_new();
-    gtk_text_view_set_editable(GTK_TEXT_VIEW(text), FALSE);
-    app->log_buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text));
-    gtk_container_add(GTK_CONTAINER(scrolled), text);
+    GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+    GtkWidget *text_view = gtk_text_view_new();
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
+    app->log_buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    gtk_container_add(GTK_CONTAINER(scrolled), text_view);
+    gtk_box_pack_start(GTK_BOX(right_box), scrolled, TRUE, TRUE, 0);
 
-    // --- Signals ---
+    // SINAIS
     g_signal_connect(win, "destroy", G_CALLBACK(on_window_destroy), app);
     g_signal_connect(win, "delete-event", G_CALLBACK(on_window_delete), app);
     g_signal_connect(app->btn_start, "clicked", G_CALLBACK(on_btn_start_clicked), app);
@@ -242,7 +246,6 @@ GtkWidget* create_main_window(AppContext *app) {
 
     return win;
 }
-
 
 static void set_controls_sensitive(AppContext *app, gboolean state){
     gtk_widget_set_sensitive(app->entry_threads, state);
@@ -260,8 +263,7 @@ static void set_controls_sensitive(AppContext *app, gboolean state){
 static void export_csv_dialog(AppContext *app){
     GtkWidget *dialog = gtk_file_chooser_dialog_new("Exportar CSV", GTK_WINDOW(app->win),
         GTK_FILE_CHOOSER_ACTION_SAVE, "_Cancelar", GTK_RESPONSE_CANCEL, "_Salvar", GTK_RESPONSE_ACCEPT, NULL);
-    
-    // Sugerir um nome de arquivo padrão
+
     char default_name[64];
     snprintf(default_name, sizeof(default_name), "HardStress_ManualExport_%.0f.csv", (double)time(NULL));
     gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), default_name);
@@ -275,27 +277,24 @@ static void export_csv_dialog(AppContext *app){
             gtk_widget_destroy(dialog);
             return;
         }
-        
+
         fprintf(f, "timestamp");
         for (int c=0;c<app->cpu_count;c++) fprintf(f, ",cpu%d_usage", c);
         for (int t=0;t<app->threads;t++) fprintf(f, ",thread%d_iters", t);
         fprintf(f, ",temp_celsius\n");
-        
-        // Exporta o histórico atualmente na memória (buffer circular)
+
         g_mutex_lock(&app->history_mutex);
         for (int s=0;s<app->history_len;s++){
             int idx = (app->history_pos + 1 + s) % app->history_len;
-            // Timestamp fictício, já que o real não é armazenado no buffer
             fprintf(f, "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
-            // CPU usage não está sincronizado com o buffer de iterações, então exportamos apenas iterações
-             for (int c=0;c<app->cpu_count;c++) fprintf(f, ",-1.0"); // Dado indisponível
+             for (int c=0;c<app->cpu_count;c++) fprintf(f, ",-1.0");
             if(app->thread_history) {
               for (int t=0;t<app->threads;t++) fprintf(f, ",%u", app->thread_history[t][idx]);
             }
-            fprintf(f, ",-1.0\n"); // Dado indisponível
+            fprintf(f, ",-1.0\n");
         }
         g_mutex_unlock(&app->history_mutex);
-        
+
         fclose(f);
         gui_log(app, "[GUI] CSV (snapshot da memória) exportado para %s\n", fname);
         g_free(fname);
@@ -303,15 +302,13 @@ static void export_csv_dialog(AppContext *app){
     gtk_widget_destroy(dialog);
 }
 
-/* --- Funções de Desenho --- */
-
 static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
     AppContext *app = (AppContext*)user_data;
     GtkAllocation alloc; gtk_widget_get_allocation(widget, &alloc);
     int w = alloc.width, h = alloc.height;
     int n = app->cpu_count > 0 ? app->cpu_count : 1;
     int bw = w / n;
-    
+
     g_mutex_lock(&app->cpu_mutex);
     for (int i=0;i<n;i++){
         double u = (app->cpu_usage && i < app->cpu_count) ? app->cpu_usage[i] : 0.0;
@@ -359,7 +356,7 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
 
         cairo_set_source_rgb(cr, 0.06,0.06,0.06);
         cairo_rectangle(cr, 0, y0, W, area_h); cairo_fill(cr);
-        
+
         if (status == WORKER_ALLOC_FAIL) {
             cairo_set_source_rgb(cr, COLOR_ERR.r, COLOR_ERR.g, COLOR_ERR.b);
             cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
@@ -373,21 +370,21 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
             cairo_set_line_width(cr, 1.0);
             int samples = app->history_len;
             double step = (samples > 1) ? ((double)W / (samples - 1)) : W;
-            
+
             int start_idx = (app->history_pos + 1) % samples;
             unsigned last_v = app->thread_history ? app->thread_history[t][start_idx] : 0;
 
             for (int s = 0; s < samples; s++) {
                 int current_idx = (start_idx + s) % samples;
                 unsigned current_v = app->thread_history ? app->thread_history[t][current_idx] : 0;
-                
+
                 double y_val = ((double)(current_v - last_v)) / ITER_SCALE;
                 double y = y0 + area_h - y_val * area_h;
                 if (y < y0) y = y0; else if (y > y0 + area_h) y = y0 + area_h;
 
                 if (s == 0) cairo_move_to(cr, s * step, y);
                 else cairo_line_to(cr, s * step, y);
-                
+
                 last_v = current_v;
             }
             cairo_stroke(cr);
