@@ -1,110 +1,122 @@
-# HardStress: Advanced Utility for Stress Testing and System Monitoring
+# HardStress: Advanced CPU and Memory Stress-Testing Utility with Real-Time Monitoring
 
-## 1. Overview
+## 1\. Abstract
 
-**HardStress** is a high-performance software utility designed to subject computing systems to intensive CPU and memory workloads. Developed in C, with a graphical user interface (GUI) implemented using the GTK3 toolkit, the tool provides real-time system performance monitoring through graphs rendered with the Cairo library. Its cross-platform architecture ensures compatibility with POSIX-based operating systems (such as Linux) and Windows, utilizing native concurrency abstractions (`pthreads` and Windows API, respectively). The primary objective of HardStress is to provide developers, system analysts, and hardware enthusiasts with a robust tool for stability validation, thermal performance analysis, and the identification of performance bottlenecks under sustained stress.
+**HardStress** is a high-performance, cross-platform software utility engineered to subject computational systems to intensive, sustained CPU and memory workloads. Developed in C with a graphical user interface (GUI) rendered by the GTK3 toolkit and Cairo graphics library, the application provides sophisticated, real-time monitoring of key performance metrics. Its architecture ensures portability between POSIX-compliant operating systems (e.g., Linux) and Microsoft Windows by leveraging native concurrency abstractions (`pthreads` and the Win32 API, respectively). The primary objective of HardStress is to furnish developers, system analysts, and hardware engineers with an empirical tool for stability validation, thermal performance assessment, and the identification of performance bottlenecks under extreme operational conditions.
 
-## 2. Key Features
+## 2\. Core Features
 
-* **Multi-threaded CPU Stress Testing:** Ability to launch a configurable number of worker threads to fully utilize all available processing cores.
-* **Intensive Memory Allocation:** Each worker thread allocates and operates on a user-defined memory buffer, stressing the memory subsystem and memory controller.
-* **CPU Affinity (Thread Pinning):** Option to bind each worker thread to a specific CPU core, enabling more consistent and controlled performance tests by eliminating scheduler-induced thread migration overhead.
-* **Real-time Data Visualization:**
+  * **Multi-threaded Stress Kernel:** Launches a user-configurable number of worker threads to achieve maximal utilization of all available processor cores. The computational kernel executes a heterogeneous mix of floating-point, integer, and memory-streaming operations to stress the FPU, ALUs, and system memory bus concurrently.
+  * **Configurable Workloads:** Allows precise definition of test parameters, including the number of threads, memory allocation per thread (in MiB), and total test duration. A duration of zero enables indefinite operation until manually terminated.
+  * **CPU Core Affinity (Pinning):** Provides an option to bind each worker thread to a specific CPU core, mitigating scheduler-induced thread migration and enabling more consistent, deterministic performance analysis.
+  * **Real-time Data Visualization:**
+      * **Per-Core CPU Utilization Graph:** Renders a real-time bar chart displaying the utilization percentage for each individual CPU core.
+      * **Per-Thread Performance History Graph:** A novel line chart that plots the historical iteration count for each worker thread over a sliding time window. This visualization is critical for identifying performance degradation, cross-core inconsistencies, and the effects of thermal throttling.
+  * **System Temperature Monitoring:** Integrates with hardware sensors to display real-time CPU temperature, providing crucial data for thermal analysis (requires `lm-sensors` on Linux or WMI access on Windows).
+  * **Performance Data Export:** Features functionality to export all collected time-series data—including timestamps, per-core CPU usage, per-thread iteration counts, and temperature—to a CSV file for advanced offline analysis and reporting.
+  * **Integrated Event Logging:** A dedicated panel within the GUI reports key operational events, including test initiation, termination, resource allocation failures, and other diagnostic messages.
 
-  * **CPU Utilization Graph:** Displays aggregated CPU usage over time, allowing immediate observation of test impact.
-  * **Thread Iteration Graph:** Monitors and plots the number of operations (iterations) completed by each thread individually, helping to detect performance inconsistencies across cores or issues like thermal throttling.
-* **Temperature Monitoring:** Integration with system hardware sensors to display real-time CPU temperature (requires `lm-sensors` on Linux or WMI access on Windows).
-* **Configurable Parameters:** Users can easily define the number of threads, memory per thread (in MiB), and total test duration in seconds.
-* **Data Export:** Functionality to export collected performance data to CSV format, facilitating further analysis with external tools.
-* **Log Panel:** An integrated log panel within the GUI reports key events, such as test initiation and termination, resource allocation, and possible errors.
+## 3\. System Architecture and Implementation
 
-## 3. Architecture and Implementation Details
-
-The software is structured around a central `AppContext`, which manages the global application state, including test configurations, thread handles, data structures for graphing, and GUI components.
+The software is architected around a central `AppContext` structure, which encapsulates the entire application state, thereby avoiding global variables and promoting modularity.
 
 ### 3.1. Concurrency Model
 
-The workload is distributed across multiple "worker" threads. On POSIX systems, the program uses the `pthread` library for thread creation and management. On Windows, it interfaces directly with the Win32 API. The use of `_Atomic` types (`stdatomic.h`) for global counters (such as total iterations and errors) ensures data consistency and thread-safety for simple operations without requiring heavy mutexes.
+HardStress employs a multi-threaded architecture to manage its workload and maintain a responsive user interface.
 
-### 3.2. Stress Kernel
+  * **Controller Thread:** Upon test initiation, a dedicated "controller" thread is spawned in a detached state. This thread orchestrates the entire lifecycle of the stress test: it allocates resources, creates and manages worker threads, monitors the test duration, and performs cleanup. This design prevents the GUI thread from blocking during intensive setup or teardown operations.
+  * **Worker Threads:** These threads execute the primary stress-testing logic. Their lifecycle is managed entirely by the controller thread.
+  * **Sampler Thread:** A separate thread periodically collects CPU utilization and temperature data. It operates independently and communicates with the GUI thread asynchronously to trigger screen redraws.
+  * **Thread Safety:** Data consistency for shared counters (e.g., total iterations, errors) is ensured through the use of atomic types from `<stdatomic.h>`, while access to complex shared data structures (e.g., CPU usage arrays, history buffers) is synchronized using `GMutex`.
 
-Each worker thread executes an intensive computational loop involving floating-point operations, integer manipulations, and sequential memory accesses within the allocated buffer. This design ensures simultaneous stress on multiple CPU components (FPU, ALU) and the memory bus.
+### 3.2. Metrics Collection and Storage
 
-### 3.3. Metrics Collection
+  * **CPU Usage:** On Linux, utilization metrics are derived by parsing `/proc/stat`. On Windows, the application is designed to interface with the Performance Data Helper (PDH) library. A differential sampling algorithm is implemented in `compute_usage` to calculate the percentage of non-idle time between two points.
+  * **Performance History:** The application maintains a circular buffer for each worker thread, storing the last `HISTORY_SAMPLES` (240) iteration counts. This data structure efficiently provides the time-series data required for rendering the historical performance graphs.
+  * **Temperature:** On Linux, temperature is obtained by parsing the output of the `sensors -u` command. On Windows, it is queried via PowerShell, which interfaces with the `MSAcpi_ThermalZoneTemperature` WMI class.
 
-* **CPU Usage:** On Linux, CPU usage is calculated by reading and processing data from `/proc/stat`. On Windows, the Performance Data Helper library (`pdh.lib`) is used to query system performance counters. The `compute_usage` function implements differential sampling between two time points to determine the percentage of non-idle time.
-* **Performance History:** The application maintains a circular buffer (`thread_iters_history`) that stores iteration counts for each thread over the last `HISTORY_SAMPLES` (240) samples. This buffer is used by Cairo's drawing routines to render historical performance graphs.
+### 3.3. Graphical User Interface
 
-### 3.4. Graphical User Interface
+The GUI is constructed using the GTK3 toolkit. All data visualizations are custom-drawn on `GtkDrawingArea` widgets using the Cairo 2D graphics library, which affords complete control over the rendering pipeline and visual aesthetics.
 
-The interface is entirely built with GTK3 and designed to be intuitive. Graphs are rendered directly onto drawing areas (`GtkDrawingArea`) using the Cairo graphics library, without relying on third-party widgets. This approach provides full control over the appearance and performance of data visualizations.
+## 4\. Build and Execution
 
-## 4. Prerequisites
+### 4.1. Prerequisites
 
-### Linux (Debian/Ubuntu)
+#### Linux (Debian/Ubuntu)
 
-A C compiler and the GTK3 development libraries are required:
+A C compiler (`build-essential`) and the GTK3 development libraries are required.
 
 ```bash
 sudo apt update
 sudo apt install build-essential libgtk-3-dev
 ```
 
-Optionally, for temperature monitoring, install `lm-sensors`:
+For temperature monitoring, `lm-sensors` is recommended:
 
 ```bash
 sudo apt install lm-sensors
 ```
 
-### Windows (using MSYS2)
+#### Windows (with MSYS2)
 
-Install the MSYS2 environment and, from its terminal, install the MinGW-w64 toolchain and GTK3 libraries:
+Install the MSYS2 environment. From the MSYS2 MINGW64 terminal, install the necessary toolchain and libraries:
 
 ```bash
-pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-gtk3
+pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-gtk3 pkg-config
 ```
 
-## 5. Building and Running
+### 4.2. Building from Source
 
-The project includes a `Makefile` to simplify the build process on both platforms.
+The project includes a `Makefile` that automates the compilation process.
 
-1. Clone the repository:
+1.  **Clone the repository:**
 
-   ```bash
-   git clone https://github.com/felipebehling/Hardstress.git
-   cd HardStress
-   ```
+    ```bash
+    git clone https://github.com/felipebehling/Hardstress.git
+    cd Hardstress
+    ```
 
-2. Compile the program:
+2.  **Compile:**
 
-   ```bash
-   make
-   ```
+      * For a standard debug build:
+        ```bash
+        make
+        ```
+      * For a high-performance release build (with `-O3` and native architecture optimizations):
+        ```bash
+        make release
+        ```
 
-3. Run the application:
+3.  **Run:**
 
-   ```bash
-   ./hardstress
-   ```
+    ```bash
+    ./HardStress
+    ```
 
-## 6. Usage Guide
+### 4.3. Pre-compiled Releases
 
-1. **Configure Parameters:**
+For convenience, a GitHub Actions workflow automatically builds and packages the application for both Linux and Windows upon every new version tag. These binaries are available for download from the "Releases" section of the GitHub repository.
 
-   * **Threads:** Set the number of stress threads. A good starting point is the number of logical CPU cores.
-   * **Mem/Thread (MiB):** Specify the amount of RAM, in Mebibytes, to be allocated by each thread.
-   * **Duration (s):** Define the duration of the test in seconds. Set to 0 for an indefinite test (until manually stopped).
-   * **Pin Threads to Cores:** Enable this option to bind threads to specific CPU cores.
+## 5\. Usage Guide
 
-2. **Start the Test:** Click the "Start" button. Graphs and counters will begin updating in real-time.
+1.  **Configure Parameters:**
+      * **Threads:** Set the number of worker threads (e.g., the number of logical CPU cores).
+      * **Mem (MiB/thread):** Specify the RAM allocation for each thread.
+      * **Duration (s):** Define the test length in seconds (0 for indefinite).
+      * **Pin threads to CPUs:** Enable CPU affinity.
+2.  **Initiate Test:** Click the "Start" button.
+3.  **Monitor:** Observe real-time data on the CPU and iteration graphs.
+4.  **Terminate Test:** Click "Stop" to end the test manually. The test will also stop automatically if a duration was set.
+5.  **Export Data:** After a test run, click "Export CSV" to save the collected metrics.
 
-3. **Stop the Test:** Click the "Stop" button at any time to interrupt the test. If a duration was set, the test will stop automatically.
+## 6\. Dependencies
 
-4. **Export Results:** After the test ends, click "Export CSV" to save the performance data.
+  * **GTK3:** GUI Toolkit.
+  * **Cairo:** 2D Graphics Rendering.
+  * **pthreads:** (Linux/POSIX) Concurrency support.
+  * **PDH Library:** (Windows) System performance counters.
 
-## 7. Dependencies
+## 7\. License
 
-* **GTK3:** For the graphical user interface.
-* **Cairo:** For 2D graph rendering.
-* **pthreads:** (Linux/POSIX) For multi-threading support.
-* **PDH Library:** (Windows) For CPU performance monitoring.
+This project is licensed under the MIT License. See the `LICENSE` file for full details.
