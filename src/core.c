@@ -124,7 +124,8 @@ static void worker_main(void *arg){
     uint64_t seed = 0x12340000 + (uint64_t)w->tid;
 
     if (app->kernel_fpu_en && w->buf) {
-        for (size_t i=0;i<floats;i++){
+        // MODIFICADO: A condição do loop foi alterada de 'floats' para 'floats / 3'
+        for (size_t i=0; i < (floats / 3); i++){
             A[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
             B[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
             C[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
