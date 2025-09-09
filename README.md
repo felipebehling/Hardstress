@@ -71,7 +71,7 @@ The project includes a `Makefile` to simplify the build process on both platform
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-username/HardStress.git
+   git clone https://github.com/felipebehling/Hardstress.git
    cd HardStress
    ```
 
