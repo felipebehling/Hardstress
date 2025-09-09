@@ -241,7 +241,8 @@ static void export_csv_dialog(AppContext *app){
     
     // Sugerir um nome de arquivo padrão
     char default_name[64];
-    snprintf(default_name, sizeof(default_name), "HardStress_ManualExport_%.0f.csv", time(NULL));
+    // MODIFICADO: Adicionado (double) para corrigir o aviso de formato
+    snprintf(default_name, sizeof(default_name), "HardStress_ManualExport_%.0f.csv", (double)time(NULL));
     gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), default_name);
 
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT){
