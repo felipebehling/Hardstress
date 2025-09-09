@@ -10,6 +10,7 @@ static void on_btn_start_clicked(GtkButton *b, gpointer ud);
 static void on_btn_stop_clicked(GtkButton *b, gpointer ud);
 static void on_btn_export_clicked(GtkButton *b, gpointer ud);
 static gboolean on_window_delete(GtkWidget *w, GdkEvent *e, gpointer ud);
+static void on_window_destroy(GtkWidget *w, gpointer ud); // ADICIONADO
 static gboolean ui_tick(gpointer ud);
 static void set_controls_sensitive(AppContext *app, gboolean state);
 static void export_csv_dialog(AppContext *app);
@@ -17,6 +18,25 @@ static gboolean gui_update_started(gpointer ud);
 static gboolean gui_update_stopped(gpointer ud);
 
 /* --- Implementações --- */
+
+// ADICIONADA NOVA FUNÇÃO on_window_destroy PARA LIMPEZA SEGURA
+static void on_window_destroy(GtkWidget *w, gpointer ud) {
+    (void)w;
+    AppContext *app = (AppContext*)ud;
+
+    // Limpeza que antes estava em main.c
+    if (atomic_load(&app->running)) {
+        atomic_store(&app->running, 0);
+    }
+    g_mutex_clear(&app->cpu_mutex);
+    g_mutex_clear(&app->history_mutex);
+    g_mutex_clear(&app->temp_mutex);
+    free(app);
+    
+    // Finaliza o loop do GTK
+    gtk_main_quit();
+}
+
 
 void gui_log(AppContext *app, const char *fmt, ...){
     va_list ap; va_start(ap, fmt);
@@ -208,7 +228,8 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_container_add(GTK_CONTAINER(scrolled), text);
 
     // --- Signals ---
-    g_signal_connect(win, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+    // MODIFICADO: Trocado gtk_main_quit por on_window_destroy para garantir a limpeza correta.
+    g_signal_connect(win, "destroy", G_CALLBACK(on_window_destroy), app);
     g_signal_connect(win, "delete-event", G_CALLBACK(on_window_delete), app);
     g_signal_connect(app->btn_start, "clicked", G_CALLBACK(on_btn_start_clicked), app);
     g_signal_connect(app->btn_stop, "clicked", G_CALLBACK(on_btn_stop_clicked), app);
@@ -241,7 +262,6 @@ static void export_csv_dialog(AppContext *app){
     
     // Sugerir um nome de arquivo padrão
     char default_name[64];
-    // MODIFICADO: Adicionado (double) para corrigir o aviso de formato
     snprintf(default_name, sizeof(default_name), "HardStress_ManualExport_%.0f.csv", (double)time(NULL));
     gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), default_name);
 
