@@ -95,9 +95,8 @@ void controller_thread_func(void *arg){
     thread_detach(app->controller_thread); 
     app->controller_thread = 0;
 
-    // MODIFICADO: Em vez de chamar gtk_main_quit, destruímos a janela.
-    // Isso acionará o sinal "destroy" e a nossa função de limpeza on_window_destroy.
-    g_idle_add((GSourceFunc)gtk_widget_destroy, app->win);
+    // MODIFICADO: Em vez de fechar o programa, reativamos a UI para um novo teste.
+    g_idle_add((GSourceFunc)gui_update_stopped, app);
 }
 
 /* --- Implementação da Thread Worker e Kernels --- */
@@ -148,59 +147,4 @@ static void worker_main(void *arg){
         }
         for (uint32_t i=0; i<w->idx_len; i++) w->idx[i] = i;
         shuffle32(w->idx, w->idx_len, &seed);
-        w->idx[w->idx_len-1] = 0;
-    }
-
-    atomic_store(&w->running, 1u);
-
-    while (atomic_load(&w->running) && atomic_load(&app->running)){
-        if (w->buf) {
-            if(app->kernel_fpu_en) kernel_fpu(A,B,C, (floats / 3), 4);
-            if(app->kernel_int_en) kernel_int(I64, (w->buf_bytes / sizeof(uint64_t)) > 1024 ? 1024 : (w->buf_bytes / sizeof(uint64_t)), 4);
-            if(app->kernel_stream_en) kernel_stream(w->buf, w->buf_bytes);
-            if(app->kernel_ptr_en && w->idx) kernel_ptrchase(w->idx, w->idx_len, 4);
-        }
-        
-        atomic_fetch_add(&w->iters, 1u);
-        atomic_fetch_add(&app->total_iters, 1u);
-        
-        g_mutex_lock(&app->history_mutex);
-        if (app->thread_history) app->thread_history[w->tid][app->history_pos] = atomic_load(&w->iters);
-        g_mutex_unlock(&app->history_mutex);
-    }
-
-    if(w->idx) free(w->idx);
-    if(w->buf) free(w->buf);
-}
-
-static void kernel_fpu(float *A, float *B, float *C, size_t n, int iters){
-    for (int k = 0; k < iters; ++k)
-        for (size_t i = 0; i < n; ++i) C[i] = A[i]*B[i] + C[i];
-}
-
-static inline uint64_t mix64(uint64_t x){
-    x ^= x >> 33; x *= 0xff51afd7ed558ccdULL; x ^= x >> 33; x *= 0xc4ceb9fe1a85ec53ULL; x ^= x >> 33;
-    return x;
-}
-
-static void kernel_int(uint64_t *dst, size_t n, int iters){
-    uint64_t acc = 0xC0FFEE;
-    for (int k=0;k<iters;k++){
-        for (size_t i=0;i<n;i++){
-            acc ^= mix64(dst[i] + i);
-            dst[i] = acc + (dst[i] << 1) + (dst[i] >> 3);
-        }
-    }
-}
-
-static void kernel_stream(uint8_t *buf, size_t n){
-    memset(buf, 0xA5, n/2);
-    memcpy(buf + n/2, buf, n/2);
-}
-
-static void kernel_ptrchase(uint32_t *idx, size_t n, int rounds){
-    size_t i = 0;
-    for (int r=0;r<rounds;r++)
-        for (size_t s=0;s<n;s++) i = idx[i];
-    (void)i; // Evita warning de variável não usada
-}
+        w->idx[w->idx_
