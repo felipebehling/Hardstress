@@ -12,7 +12,7 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#define _WIN32_DCOM
+// A LINHA ABAIXO FOI REMOVIDA
 #include <comdef.h>
 #include <Wbemidl.h>
 #include <pdh.h>
