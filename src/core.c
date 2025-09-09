@@ -84,7 +84,7 @@ void controller_thread_func(void *arg){
         app->csv_log_file = NULL;
     }
 
-    // Limpeza final
+    // Limpeza final dos buffers, mas NÃO da estrutura 'app'
     for (int i=0; i<app->threads; i++) free(app->thread_history[i]);
     free(app->thread_history); app->thread_history = NULL;
     free(app->workers); app->workers = NULL;
@@ -95,8 +95,9 @@ void controller_thread_func(void *arg){
     thread_detach(app->controller_thread); 
     app->controller_thread = 0;
 
-    // Envia a atualização final para a UI
-    g_idle_add((GSourceFunc)g_cclosure_new_swap(G_CALLBACK(gtk_main_quit), NULL, NULL), NULL); // Workaround
+    // MODIFICADO: Em vez de chamar gtk_main_quit, destruímos a janela.
+    // Isso acionará o sinal "destroy" e a nossa função de limpeza on_window_destroy.
+    g_idle_add((GSourceFunc)gtk_widget_destroy, app->win);
 }
 
 /* --- Implementação da Thread Worker e Kernels --- */
@@ -124,7 +125,6 @@ static void worker_main(void *arg){
     uint64_t seed = 0x12340000 + (uint64_t)w->tid;
 
     if (app->kernel_fpu_en && w->buf) {
-        // Correção anterior (correta)
         for (size_t i=0; i < (floats / 3); i++){
             A[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
             B[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
@@ -155,7 +155,6 @@ static void worker_main(void *arg){
 
     while (atomic_load(&w->running) && atomic_load(&app->running)){
         if (w->buf) {
-            // MODIFICADO: Passa o tamanho correto (floats / 3) para o kernel
             if(app->kernel_fpu_en) kernel_fpu(A,B,C, (floats / 3), 4);
             if(app->kernel_int_en) kernel_int(I64, (w->buf_bytes / sizeof(uint64_t)) > 1024 ? 1024 : (w->buf_bytes / sizeof(uint64_t)), 4);
             if(app->kernel_stream_en) kernel_stream(w->buf, w->buf_bytes);
