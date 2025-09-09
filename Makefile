@@ -19,7 +19,6 @@ OBJS = $(SRCS:.c=.o)
 
 # Ferramentas e libs
 PKG_CONFIG ?= pkg-config
-CXX = g++ # <--- ADICIONADO
 GTK_CFLAGS := $(shell $(PKG_CONFIG) --cflags gtk+-3.0)
 GTK_LIBS   := $(shell $(PKG_CONFIG) --libs gtk+-3.0)
 
@@ -46,10 +45,10 @@ CFLAGS ?= $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 all: $(TARGET)$(TARGET_EXT)
 
 $(TARGET)$(TARGET_EXT): $(OBJS)
-	$(CXX) -o $@ $^ $(LDFLAGS) # <--- ALTERADO DE $(CC) para $(CXX)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
-	$(CXX) $(CFLAGS) -c -o $@ $< # <--- ALTERADO DE $(CC) para $(CXX)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	$(RM) $(TARGET)$(TARGET_EXT) $(SRC_DIR)/*.o
