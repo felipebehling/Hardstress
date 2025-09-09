@@ -13,7 +13,6 @@
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <process.h> // _beginthreadex
-// #pragma comment(lib, "pdh.lib") // Usamos -lpdh no Makefile em vez disso
 #else
 #include <pthread.h>
 #include <unistd.h>
@@ -67,11 +66,11 @@ struct AppContext {
 #ifdef _WIN32
     HANDLE *worker_threads;
     HANDLE cpu_sampler_handle;
-    HANDLE controller_thread_handle; // Handle para a thread de controle
+    HANDLE controller_thread_handle;
 #else
     pthread_t *worker_threads;
     pthread_t cpu_sampler_thread;
-    pthread_t controller_thread; // Handle para a thread de controle
+    pthread_t controller_thread;
 #endif
 
     /* CPU usage */
@@ -84,7 +83,7 @@ struct AppContext {
 #endif
 
     /* per-thread history */
-    unsigned **thread_history; /* [thread][history_len] */
+    unsigned **thread_history;
     int history_pos;
     int history_len;
     GMutex history_mutex;
@@ -112,7 +111,8 @@ static double now_sec(void){
 
 static void gui_log(AppContext *app, const char *fmt, ...){
     va_list ap; va_start(ap, fmt);
-    char *s = NULL; g_vasprintf(&s, fmt, ap);
+    // CORREÇÃO 1: Usar g_strdup_vprintf em vez de g_vasprintf
+    char *s = g_strdup_vprintf(fmt, ap);
     va_end(ap);
     if (!s) return;
     GtkTextIter end; gtk_text_buffer_get_end_iter(app->log_buffer, &end);
@@ -168,7 +168,6 @@ static void kernel_ptrchase(uint32_t *idx, size_t n, int rounds){
 static void worker_main(void *arg){
     worker_t *w = (worker_t*)arg;
     AppContext *app = w->app;
-    /* allocate buffer lazily (makes it safer to report to GUI if fail) */
     w->buf = malloc(w->buf_bytes);
     if (!w->buf){
         gui_log(app, "[T%d] buffer aloc failed (%zu bytes)\n", w->tid, w->buf_bytes);
@@ -212,8 +211,7 @@ static void worker_main(void *arg){
         kernel_ptrchase(w->idx, w->idx_len, 4);
         atomic_fetch_add(&w->iters, 1u);
         atomic_fetch_add(&app->total_iters, 1u);
-
-        /* store into history slot safely */
+        
         g_mutex_lock(&app->history_mutex);
         if (app->thread_history) app->thread_history[w->tid][app->history_pos] = atomic_load(&w->iters);
         g_mutex_unlock(&app->history_mutex);
@@ -277,7 +275,7 @@ static void sample_cpu_linux(AppContext *app){
     free(s1); free(s2);
 }
 #else
-/* Windows sampling via PDH - IMPLEMENTAÇÃO CORRIGIDA */
+/* Windows sampling via PDH */
 static int pdh_init_query(AppContext *app){
     if (PdhOpenQuery(NULL, 0, &app->pdh_query) != ERROR_SUCCESS) {
         return -1;
@@ -331,7 +329,6 @@ static void sample_cpu_windows(AppContext *app){
 /* Temperature sampling */
 #ifndef _WIN32
 static void sample_temp_linux(AppContext *app){
-    /* Try to call `sensors -u` and parse first temperature input */
     FILE *p = popen("sensors -u 2>/dev/null", "r");
     if (!p){ g_mutex_lock(&app->temp_mutex); app->temp_celsius = -1.0; g_mutex_unlock(&app->temp_mutex); return; }
     char line[256];
@@ -351,7 +348,6 @@ static void sample_temp_linux(AppContext *app){
 }
 #else
 static void sample_temp_windows(AppContext *app){
-    /* Use PowerShell WMI query for thermal zones (may not exist) */
     FILE *p = _popen("powershell -Command \"try { Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root\\wmi | Select-Object -ExpandProperty CurrentTemperature -First 1 } catch {}\" 2> $null", "r");
     if (!p){ g_mutex_lock(&app->temp_mutex); app->temp_celsius = -1.0; g_mutex_unlock(&app->temp_mutex); return; }
     char buf[128]; double found = -1.0;
@@ -375,13 +371,10 @@ static void cpu_sampler_thread_func(void *arg){
         sample_cpu_windows(app);
         sample_temp_windows(app);
 #endif
-        /* redraw UI via idle */
         g_idle_add((GSourceFunc)gtk_widget_queue_draw, app->cpu_drawing);
         g_idle_add((GSourceFunc)gtk_widget_queue_draw, app->iters_drawing);
-        /* advance history position */
         g_mutex_lock(&app->history_mutex);
         app->history_pos = (app->history_pos + 1) % app->history_len;
-        /* clear next history slot for all threads */
         if (app->thread_history){
             for (int t=0;t<app->threads;t++){
                 app->thread_history[t][app->history_pos] = 0;
@@ -416,7 +409,6 @@ static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
         cairo_move_to(cr, x+4, 12); cairo_show_text(cr, txt);
     }
     g_mutex_unlock(&app->cpu_mutex);
-    /* temp */
     g_mutex_lock(&app->temp_mutex);
     double temp = app->temp_celsius;
     g_mutex_unlock(&app->temp_mutex);
@@ -432,7 +424,7 @@ static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
 /* UI: iterations per thread draw */
 static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data){
     AppContext *app = (AppContext*)user_data;
-    if (!app->running) return FALSE;
+    if (!atomic_load(&app->running)) return FALSE;
 
     GtkAllocation alloc; gtk_widget_get_allocation(widget, &alloc);
     int W = alloc.width, H = alloc.height;
@@ -458,15 +450,13 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
             int current_idx = (start_idx + s) % samples;
             unsigned current_v = app->thread_history ? app->thread_history[t][current_idx] : 0;
             
-            if (s == 0) { // Move to the first point
-                double y = y0 + area_h - (((double)(current_v - last_v)) / ITER_SCALE) * area_h;
-                if (y < y0) y = y0; else if (y > y0 + area_h) y = y0 + area_h;
-                cairo_move_to(cr, s * step, y);
-            } else {
-                double y = y0 + area_h - (((double)(current_v - last_v)) / ITER_SCALE) * area_h;
-                if (y < y0) y = y0; else if (y > y0 + area_h) y = y0 + area_h;
-                cairo_line_to(cr, s * step, y);
-            }
+            double y_val = ((double)(current_v - last_v)) / ITER_SCALE;
+            double y = y0 + area_h - y_val * area_h;
+            if (y < y0) y = y0; else if (y > y0 + area_h) y = y0 + area_h;
+
+            if (s == 0) cairo_move_to(cr, s * step, y);
+            else cairo_line_to(cr, s * step, y);
+            
             last_v = current_v;
         }
         cairo_stroke(cr);
@@ -549,7 +539,6 @@ static void controller_thread_func(void *arg){
     atomic_store(&app->total_iters, 0);
     app->start_time = now_sec();
 
-    /* init CPU arrays */
     app->cpu_count = detect_cpu_count();
     app->cpu_usage = calloc(app->cpu_count, sizeof(double));
 #ifdef _WIN32
@@ -570,7 +559,8 @@ static void controller_thread_func(void *arg){
     app->worker_threads = calloc(app->threads, sizeof(pthread_t));
 #endif
     for (int i=0;i<app->threads;i++){
-        app->workers[i] = (worker_t){ .tid = i, .mem_mib_per_thread = app->mem_mib_per_thread, .app = app };
+        // CORREÇÃO 2: Removido o membro inexistente 'mem_mib_per_thread'
+        app->workers[i] = (worker_t){ .tid = i, .app = app };
         app->workers[i].buf_bytes = app->mem_mib_per_thread * 1024ULL * 1024ULL;
     }
 
@@ -605,7 +595,11 @@ static void controller_thread_func(void *arg){
              atomic_store(&app->running, 0);
              break;
         }
-        Sleep(200);
+        #ifdef _WIN32
+            Sleep(200);
+        #else
+            struct timespec r = {0, 200*1000000}; nanosleep(&r,NULL);
+        #endif
     }
 
     for (int i=0;i<app->threads;i++) atomic_store(&app->workers[i].running, 0);
@@ -617,6 +611,7 @@ static void controller_thread_func(void *arg){
 #endif
     }
 #ifdef _WIN32
+    atomic_store(&app->running, 0); // Garante que o sampler pare
     if(app->cpu_sampler_handle) { WaitForSingleObject(app->cpu_sampler_handle, INFINITE); CloseHandle(app->cpu_sampler_handle); }
 #else
     pthread_join(app->cpu_sampler_thread, NULL);
@@ -633,8 +628,10 @@ static void controller_thread_func(void *arg){
 
     g_idle_add(gui_update_stopped, app);
 #ifdef _WIN32
-    CloseHandle(app->controller_thread_handle);
-    app->controller_thread_handle = NULL;
+    if (app->controller_thread_handle) {
+        CloseHandle(app->controller_thread_handle);
+        app->controller_thread_handle = NULL;
+    }
 #endif
 }
 
@@ -687,7 +684,10 @@ static void on_btn_export_clicked(GtkButton *b, gpointer ud){
 /* UI periodic tick to update status (iters/s) */
 static gboolean ui_tick(gpointer ud){
     AppContext *app = (AppContext*)ud;
-    if (!atomic_load(&app->running)) return TRUE;
+    if (!atomic_load(&app->running)) {
+        gtk_label_set_text(GTK_LABEL(app->status_label), "Parado");
+        return TRUE;
+    }
     static unsigned long long last_total = 0;
     unsigned long long cur = atomic_load(&app->total_iters);
     unsigned long long diff = cur - last_total;
@@ -706,9 +706,9 @@ static gboolean on_window_delete(GtkWidget *w, GdkEvent *e, gpointer ud){
         gui_log(app, "[GUI] fechando: solicitando parada...\n");
         atomic_store(&app->running, 0);
 #ifdef _WIN32
-        if(app->controller_thread_handle) WaitForSingleObject(app->controller_thread_handle, 1000);
+        if(app->controller_thread_handle) WaitForSingleObject(app->controller_thread_handle, 1500);
 #else
-        struct timespec r = {1,0}; nanosleep(&r,NULL);
+        struct timespec r = {1, 500000000}; nanosleep(&r,NULL);
 #endif
     }
     return FALSE;
@@ -738,7 +738,6 @@ int main(int argc, char **argv){
     gtk_grid_set_column_spacing(GTK_GRID(grid), 6);
     gtk_container_set_border_width(GTK_CONTAINER(grid), 8);
 
-    /* Controls */
     gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Threads (0=auto):"), 0, 0, 1, 1);
     app->entry_threads = gtk_entry_new(); gtk_entry_set_text(GTK_ENTRY(app->entry_threads), "0");
     gtk_grid_attach(GTK_GRID(grid), app->entry_threads, 1, 0, 1, 1);
