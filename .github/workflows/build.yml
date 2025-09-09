@@ -6,29 +6,21 @@ on:
       - "v*.*.*"
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev
 
-      - name: Build
-        run: make release
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: HardStress-linux
-          path: HardStress
-
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up MSYS2
+      - name: Set up MSYS2 (Windows)
+        if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
         with:
           update: true
@@ -38,19 +30,36 @@ jobs:
             pkg-config
           msystem: MINGW64
 
-      - name: Build
+      - name: Build (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: make release
+
+      - name: Build (Windows)
+        if: matrix.os == 'windows-latest'
         shell: msys2 {0}
         run: |
           make release CC=x86_64-w64-mingw32-gcc TARGET=HardStress.exe
 
+      - name: Prepare Artifact Name
+        id: artifact_name
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            echo "NAME=HardStress-windows" >> $GITHUB_ENV
+            echo "FILE=HardStress.exe" >> $GITHUB_ENV
+          else
+            echo "NAME=HardStress-linux" >> $GITHUB_ENV
+            echo "FILE=HardStress" >> $GITHUB_ENV
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HardStress-windows
-          path: HardStress.exe
+          name: ${{ env.NAME }}
+          path: ${{ env.FILE }}
 
   release:
-    needs: [build-linux, build-windows]
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
