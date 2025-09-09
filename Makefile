@@ -26,7 +26,8 @@ GTK_LIBS   := $(shell $(PKG_CONFIG) --libs gtk+-3.0)
 ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -D_WIN32_DCOM -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid
+    # MODIFICADO: Adicionada a biblioteca -loleaut32
+    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32
 else
     # Linux/Outros
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
