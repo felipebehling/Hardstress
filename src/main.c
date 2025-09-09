@@ -38,12 +38,7 @@ int main(int argc, char **argv){
     // Inicia o loop da interface gráfica
     gtk_main();
 
-    // Limpeza ao sair
-    if (atomic_load(&app->running)) atomic_store(&app->running, 0);
-    g_mutex_clear(&app->cpu_mutex);
-    g_mutex_clear(&app->history_mutex);
-    g_mutex_clear(&app->temp_mutex);
-    free(app);
+    // A LIMPEZA QUE ESTAVA AQUI FOI MOVIDA PARA on_window_destroy EM ui.c
     
     return 0;
 }
