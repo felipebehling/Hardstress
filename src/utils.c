@@ -1,4 +1,5 @@
 #include "utils.h"
+#include <process.h>
 
 double now_sec(void){
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
