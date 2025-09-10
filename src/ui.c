@@ -12,14 +12,14 @@ typedef struct {
 } rgba_t;
 
 // Paleta de cores moderna inspirada no KDE Plasma
-static const rgba_t THEME_BG_PRIMARY = {0.118, 0.118, 0.180, 1.0};      // #1e1e2e - Fundo principal
+//static const rgba_t THEME_BG_PRIMARY = {0.118, 0.118, 0.180, 1.0};      // #1e1e2e - Fundo principal
 static const rgba_t THEME_BG_SECONDARY = {0.157, 0.157, 0.227, 1.0};    // #28283a - Painéis
 static const rgba_t THEME_BG_TERTIARY = {0.196, 0.196, 0.274, 1.0};     // #32324a - Elementos elevados
 static const rgba_t THEME_ACCENT = {0.0, 0.749, 1.0, 1.0};              // #00bfff - Azul ciano vibrante
 static const rgba_t THEME_ACCENT_DIM = {0.0, 0.498, 0.667, 1.0};        // #007faa - Azul mais escuro
 static const rgba_t THEME_WARN = {0.976, 0.886, 0.686, 1.0};            // #f9e2af - Âmbar/Laranja
 static const rgba_t THEME_ERROR = {0.949, 0.561, 0.678, 1.0};           // #f28fad - Vermelho claro
-static const rgba_t THEME_SUCCESS = {0.565, 0.933, 0.565, 1.0};         // #90ee90 - Verde claro
+//static const rgba_t THEME_SUCCESS = {0.565, 0.933, 0.565, 1.0};         // #90ee90 - Verde claro
 static const rgba_t THEME_TEXT_PRIMARY = {0.878, 0.878, 0.878, 1.0};    // #e0e0e0 - Texto principal
 static const rgba_t THEME_TEXT_SECONDARY = {0.627, 0.627, 0.627, 1.0}; // #a0a0a0 - Texto secundário
 static const rgba_t THEME_GRID = {0.235, 0.235, 0.314, 0.5};            // Grade sutil
@@ -49,8 +49,8 @@ static const char *css_theme =
     "}"
     "label {"
     "  color: #e0e0e0;"
-    "  font-family: 'Inter', 'Noto Sans', sans-serif;"
-    "  font-size: 11px;"
+    "  font-family: 'Noto Sans', sans-serif;"
+    "  font-size: 12px;"
     "}"
     "entry {"
     "  background-color: #32324a;"
@@ -67,13 +67,13 @@ static const char *css_theme =
     "}"
     "button {"
     "  background-color: #32324a;" /* sólido no lugar do gradiente */
-    "  color: #e0e0e0;"
+    "  color: #000000;"
     "  border: 1px solid rgba(0,191,255,0.25);"  /* #00bfff40 */
     "  border-radius: 6px;"
     "  padding: 10px 20px;"
-    "  font-family: 'Inter', 'Noto Sans', sans-serif;"
+    "  font-family: 'Noto Sans', sans-serif;"
     "  font-weight: 500;"
-    "  font-size: 12px;"
+    "  font-size: 16px;"
     "}"
     "button:hover {"
     "  background-color: #00bfff;" /* sólido no lugar do gradiente */
@@ -87,7 +87,7 @@ static const char *css_theme =
     "}"
     "checkbutton {"
     "  color: #e0e0e0;"
-    "  font-family: 'Inter', 'Noto Sans', sans-serif;"
+    "  font-family: 'Noto Sans', sans-serif;"
     "  font-size: 11px;"
     "}"
     "checkbutton check {"
