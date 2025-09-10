@@ -39,7 +39,9 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: msys2 {0}
         run: |
-          make release CC=x86_64-w64-mingw32-gcc TARGET=HardStress.exe
+          # CORRIGIDO: Removido 'TARGET=HardStress.exe' para evitar a criação de 'HardStress.exe.exe'.
+          # O Makefile já lida com a extensão .exe automaticamente no Windows.
+          make release CC=x86_64-w64-mingw32-gcc
 
       - name: Package Application (Linux)
         if: matrix.os == 'ubuntu-latest'
