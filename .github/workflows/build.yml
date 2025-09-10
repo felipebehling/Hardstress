@@ -25,7 +25,6 @@ jobs:
         with:
           update: true
           install: >-
-            # CORRIGIDO: Corrigido o erro de digitação de 'ó' para 'o' no nome do pacote.
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-gtk3
             pkg-config
@@ -40,8 +39,6 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: msys2 {0}
         run: |
-          # CORRIGIDO: Removido 'TARGET=HardStress.exe' para evitar a criação de 'HardStress.exe.exe'.
-          # O Makefile já lida com a extensão .exe automaticamente no Windows.
           make release CC=x86_64-w64-mingw32-gcc
 
       - name: Package Application (Linux)
@@ -65,8 +62,6 @@ jobs:
           mkdir $ARTIFACT_DIR
           mv HardStress.exe $ARTIFACT_DIR/
           
-          # Usa ldd para encontrar e copiar todas as dependências .dll necessárias
-          # O grep filtra para pegar apenas as bibliotecas do ambiente mingw64
           ldd $ARTIFACT_DIR/HardStress.exe | grep -o '/mingw64/bin/[^ ]*\.dll' | sort -u | xargs -I{} cp {} $ARTIFACT_DIR/
           
           echo "DLLs empacotadas com sucesso."
@@ -86,7 +81,7 @@ jobs:
   release:
     needs: [build]
     runs-on: ubuntu-latest
-    # CORRIGIDO: Adicionado bloco de permissões para permitir que o job crie/modifique releases.
+    # Adicionado bloco de permissões para permitir que o job crie/modifique releases.
     permissions:
       contents: write
     steps:
