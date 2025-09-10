@@ -25,7 +25,7 @@ jobs:
         with:
           update: true
           install: >-
-            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_ó64-toolchain
             mingw-w64-x86_64-gtk3
             pkg-config
             make
@@ -85,6 +85,9 @@ jobs:
   release:
     needs: [build]
     runs-on: ubuntu-latest
+    # CORRIGIDO: Adicionado bloco de permissões para permitir que o job crie/modifique releases.
+    permissions:
+      contents: write
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
