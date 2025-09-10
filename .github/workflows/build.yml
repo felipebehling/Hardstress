@@ -25,7 +25,8 @@ jobs:
         with:
           update: true
           install: >-
-            mingw-w64-x86_ó64-toolchain
+            # CORRIGIDO: Corrigido o erro de digitação de 'ó' para 'o' no nome do pacote.
+            mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-gtk3
             pkg-config
             make
