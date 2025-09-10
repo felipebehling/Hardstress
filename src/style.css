@@ -4,7 +4,7 @@ window {
 label {
   color: #e0e0e0;
   font-family: 'Noto Sans', sans-serif;
-  font-size: 12px;
+  font-size: 14px;
 }
 entry {
   background-color: #32324a;
@@ -13,7 +13,7 @@ entry {
   border-radius: 6px;
   padding: 8px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11px;
+  font-size: 13px;
 }
 entry:focus {
   border-color: #00bfff;
@@ -21,7 +21,7 @@ entry:focus {
 }
 button {
   background-color: #32324a; /* sólido no lugar do gradiente */
-  color: #000000;
+  color: #e0e0e0;
   border: 1px solid rgba(0,191,255,0.25);  /* #00bfff40 */
   border-radius: 6px;
   padding: 10px 20px;
@@ -31,6 +31,7 @@ button {
 }
 button:hover {
   background-color: #00bfff; /* sólido no lugar do gradiente */
+  color: #1e1e2e;
   border-color: #00bfff;
   box-shadow: 0 4px 12px rgba(0,191,255,0.25); /* #00bfff40 */
 }
@@ -42,7 +43,7 @@ button:disabled {
 checkbutton {
   color: #e0e0e0;
   font-family: 'Noto Sans', sans-serif;
-  font-size: 11px;
+  font-size: 13px;
 }
 checkbutton check {
   background-color: #32324a;
@@ -64,13 +65,13 @@ frame {
 frame > label {
   color: #00bfff;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 14px;
 }
 textview {
   background-color: #1e1e2e;
   color: #90ee90;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 10px;
+  font-size: 12px;
 }
 scrolledwindow {
   background-color: #1e1e2e;
@@ -95,7 +96,7 @@ scrollbar slider:hover {
   border-radius: 8px;
   padding: 12px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #00bfff;
 }
