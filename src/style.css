@@ -19,6 +19,7 @@ entry:focus {
   border-color: #00bfff;
   box-shadow: 0 0 0 2px rgba(0,191,255,0.125); /* #00bfff20 */
 }
+
 .styled-button {
   background-color: #32324a; /* sólido no lugar do gradiente */
   color: #e0e0e0;
@@ -29,12 +30,14 @@ entry:focus {
   font-weight: 500;
   font-size: 16px;
 }
+
 .styled-button:hover {
   background-color: #00bfff; /* sólido no lugar do gradiente */
   color: #1e1e2e;
   border-color: #00bfff;
   box-shadow: 0 4px 12px rgba(0,191,255,0.25); /* #00bfff40 */
 }
+
 .styled-button:disabled {
   background: #28283a;
   color: #606060;

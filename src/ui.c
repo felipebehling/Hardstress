@@ -420,10 +420,10 @@ static void set_controls_sensitive(AppContext *app, gboolean state){
 }
 
 static void export_csv_dialog(AppContext *app){
-    GtkWidget *dialog = gtk_file_chooser_dialog_new("Exportar Histórico para CSV", 
+    GtkWidget *dialog = gtk_file_chooser_dialog_new("Exportar Histórico para CSV",
         GTK_WINDOW(app->win),
         GTK_FILE_CHOOSER_ACTION_SAVE, 
-        "_Cancelar", GTK_RESPONSE_CANCEL, 
+        "_Cancelar", GTK_RESPONSE_CANCEL,
         "_Salvar", GTK_RESPONSE_ACCEPT, NULL);
 
     char default_name[64];
