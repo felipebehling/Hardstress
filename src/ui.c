@@ -55,32 +55,30 @@ static const char *css_theme =
     "entry {"
     "  background-color: #32324a;"
     "  color: #e0e0e0;"
-    "  border: 1px solid #00bfff40;"
+    "  border: 1px solid rgba(0,191,255,0.25);"  /* #00bfff40 */
     "  border-radius: 6px;"
     "  padding: 8px;"
     "  font-family: 'JetBrains Mono', 'Fira Code', monospace;"
     "  font-size: 11px;"
-    "  transition: all 0.3s ease;"
     "}"
     "entry:focus {"
     "  border-color: #00bfff;"
-    "  box-shadow: 0 0 0 2px #00bfff20;"
+    "  box-shadow: 0 0 0 2px rgba(0,191,255,0.125);" /* #00bfff20 */
     "}"
     "button {"
-    "  background: linear-gradient(135deg, #32324a, #28283a);"
+    "  background-color: #32324a;" /* sólido no lugar do gradiente */
     "  color: #e0e0e0;"
-    "  border: 1px solid #00bfff40;"
+    "  border: 1px solid rgba(0,191,255,0.25);"  /* #00bfff40 */
     "  border-radius: 6px;"
     "  padding: 10px 20px;"
     "  font-family: 'Inter', 'Noto Sans', sans-serif;"
     "  font-weight: 500;"
     "  font-size: 12px;"
-    "  transition: all 0.3s ease;"
     "}"
     "button:hover {"
-    "  background: linear-gradient(135deg, #00bfff, #007faa);"
+    "  background-color: #00bfff;" /* sólido no lugar do gradiente */
     "  border-color: #00bfff;"
-    "  box-shadow: 0 4px 12px #00bfff40;"
+    "  box-shadow: 0 4px 12px rgba(0,191,255,0.25);" /* #00bfff40 */
     "}"
     "button:disabled {"
     "  background: #28283a;"
@@ -94,18 +92,18 @@ static const char *css_theme =
     "}"
     "checkbutton check {"
     "  background-color: #32324a;"
-    "  border: 2px solid #00bfff40;"
+    "  border: 2px solid rgba(0,191,255,0.25);" /* #00bfff40 */
     "  border-radius: 4px;"
     "  min-width: 18px;"
     "  min-height: 18px;"
     "}"
     "checkbutton check:checked {"
-    "  background: linear-gradient(135deg, #00bfff, #007faa);"
+    "  background-color: #00bfff;" /* sólido no lugar do gradiente */
     "  border-color: #00bfff;"
     "}"
     "frame {"
     "  background-color: #28283a;"
-    "  border: 1px solid #00bfff20;"
+    "  border: 1px solid rgba(0,191,255,0.125);" /* #00bfff20 */
     "  border-radius: 8px;"
     "  padding: 12px;"
     "}"
@@ -122,7 +120,7 @@ static const char *css_theme =
     "}"
     "scrolledwindow {"
     "  background-color: #1e1e2e;"
-    "  border: 1px solid #00bfff20;"
+    "  border: 1px solid rgba(0,191,255,0.125);" /* #00bfff20 */
     "  border-radius: 8px;"
     "}"
     "scrollbar {"
@@ -130,16 +128,16 @@ static const char *css_theme =
     "  border-radius: 8px;"
     "}"
     "scrollbar slider {"
-    "  background-color: #00bfff40;"
+    "  background-color: rgba(0,191,255,0.25);" /* #00bfff40 */
     "  border-radius: 8px;"
     "  min-width: 8px;"
     "}"
     "scrollbar slider:hover {"
-    "  background-color: #00bfff60;"
+    "  background-color: rgba(0,191,255,0.375);" /* #00bfff60 */
     "}"
     ".status-label {"
-    "  background: linear-gradient(135deg, #32324a, #28283a);"
-    "  border: 1px solid #00bfff40;"
+    "  background-color: #32324a;" /* sólido no lugar do gradiente */
+    "  border: 1px solid rgba(0,191,255,0.25);" /* #00bfff40 */
     "  border-radius: 8px;"
     "  padding: 12px;"
     "  font-family: 'JetBrains Mono', monospace;"
