@@ -91,6 +91,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*/* # Modificado para pegar os arquivos dentro dos diretórios
+          files: artifacts/*/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
