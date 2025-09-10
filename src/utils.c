@@ -1,4 +1,12 @@
 #include "utils.h"
+#include <time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <stdio.h>
+#include <string.h>
+#endif
 
 // Funções que não dependem do sistema operacional
 double now_sec(void){
@@ -19,6 +27,33 @@ void shuffle32(uint32_t *a, size_t n, uint64_t *seed){
         size_t j = (size_t)(splitmix64(seed) % (i + 1));
         uint32_t tmp = a[i]; a[i] = a[j]; a[j] = tmp;
     }
+}
+
+unsigned long long get_total_system_memory() {
+#ifdef _WIN32
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status)) {
+        return status.ullTotalPhys;
+    }
+    return 0;
+#else
+    FILE *meminfo = fopen("/proc/meminfo", "r");
+    if (meminfo == NULL) {
+        return 0;
+    }
+    char line[256];
+    while (fgets(line, sizeof(line), meminfo)) {
+        if (strncmp(line, "MemTotal:", 9) == 0) {
+            unsigned long long total_mem_kb;
+            sscanf(line + 9, "%llu", &total_mem_kb);
+            fclose(meminfo);
+            return total_mem_kb * 1024;
+        }
+    }
+    fclose(meminfo);
+    return 0;
+#endif
 }
 
 
