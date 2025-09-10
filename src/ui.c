@@ -1,4 +1,4 @@
-/* ui.c - Interface Modernizada HardStress com estilo KDE Plasma */
+/* ui.c - Modern HardStress Interface with KDE Plasma style */
 #include "ui.h"
 #include "core.h"
 #include "metrics.h"
@@ -42,115 +42,33 @@ static void draw_grid_background(cairo_t *cr, int width, int height, int spacing
 
 gboolean gui_update_stopped(gpointer ud);
 
-/* --- CSS do Tema Moderno --- */
-static const char *css_theme = 
-    "window {"
-    "  background-color: #1e1e2e;"
-    "}"
-    "label {"
-    "  color: #e0e0e0;"
-    "  font-family: 'Noto Sans', sans-serif;"
-    "  font-size: 12px;"
-    "}"
-    "entry {"
-    "  background-color: #32324a;"
-    "  color: #e0e0e0;"
-    "  border: 1px solid rgba(0,191,255,0.25);"  /* #00bfff40 */
-    "  border-radius: 6px;"
-    "  padding: 8px;"
-    "  font-family: 'JetBrains Mono', 'Fira Code', monospace;"
-    "  font-size: 11px;"
-    "}"
-    "entry:focus {"
-    "  border-color: #00bfff;"
-    "  box-shadow: 0 0 0 2px rgba(0,191,255,0.125);" /* #00bfff20 */
-    "}"
-    "button {"
-    "  background-color: #32324a;" /* sólido no lugar do gradiente */
-    "  color: #000000;"
-    "  border: 1px solid rgba(0,191,255,0.25);"  /* #00bfff40 */
-    "  border-radius: 6px;"
-    "  padding: 10px 20px;"
-    "  font-family: 'Noto Sans', sans-serif;"
-    "  font-weight: 500;"
-    "  font-size: 16px;"
-    "}"
-    "button:hover {"
-    "  background-color: #00bfff;" /* sólido no lugar do gradiente */
-    "  border-color: #00bfff;"
-    "  box-shadow: 0 4px 12px rgba(0,191,255,0.25);" /* #00bfff40 */
-    "}"
-    "button:disabled {"
-    "  background: #28283a;"
-    "  color: #606060;"
-    "  border-color: #404040;"
-    "}"
-    "checkbutton {"
-    "  color: #e0e0e0;"
-    "  font-family: 'Noto Sans', sans-serif;"
-    "  font-size: 11px;"
-    "}"
-    "checkbutton check {"
-    "  background-color: #32324a;"
-    "  border: 2px solid rgba(0,191,255,0.25);" /* #00bfff40 */
-    "  border-radius: 4px;"
-    "  min-width: 18px;"
-    "  min-height: 18px;"
-    "}"
-    "checkbutton check:checked {"
-    "  background-color: #00bfff;" /* sólido no lugar do gradiente */
-    "  border-color: #00bfff;"
-    "}"
-    "frame {"
-    "  background-color: #28283a;"
-    "  border: 1px solid rgba(0,191,255,0.125);" /* #00bfff20 */
-    "  border-radius: 8px;"
-    "  padding: 12px;"
-    "}"
-    "frame > label {"
-    "  color: #00bfff;"
-    "  font-weight: 600;"
-    "  font-size: 12px;"
-    "}"
-    "textview {"
-    "  background-color: #1e1e2e;"
-    "  color: #90ee90;"
-    "  font-family: 'JetBrains Mono', 'Fira Code', monospace;"
-    "  font-size: 10px;"
-    "}"
-    "scrolledwindow {"
-    "  background-color: #1e1e2e;"
-    "  border: 1px solid rgba(0,191,255,0.125);" /* #00bfff20 */
-    "  border-radius: 8px;"
-    "}"
-    "scrollbar {"
-    "  background-color: #28283a;"
-    "  border-radius: 8px;"
-    "}"
-    "scrollbar slider {"
-    "  background-color: rgba(0,191,255,0.25);" /* #00bfff40 */
-    "  border-radius: 8px;"
-    "  min-width: 8px;"
-    "}"
-    "scrollbar slider:hover {"
-    "  background-color: rgba(0,191,255,0.375);" /* #00bfff60 */
-    "}"
-    ".status-label {"
-    "  background-color: #32324a;" /* sólido no lugar do gradiente */
-    "  border: 1px solid rgba(0,191,255,0.25);" /* #00bfff40 */
-    "  border-radius: 8px;"
-    "  padding: 12px;"
-    "  font-family: 'JetBrains Mono', monospace;"
-    "  font-size: 13px;"
-    "  font-weight: 600;"
-    "  color: #00bfff;"
-    "}";
-
 /* --- Implementações --- */
 
 static void apply_css_theme(GtkWidget *window) {
     GtkCssProvider *provider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(provider, css_theme, -1, NULL);
+    // Tenta carregar de múltiplos locais, incluindo o diretório de desenvolvimento
+    const char *css_paths[] = {
+        "src/style.css",
+        "style.css",
+        "/usr/share/hardstress/style.css",
+        NULL
+    };
+
+    gboolean loaded = FALSE;
+    for (int i = 0; css_paths[i] != NULL; i++) {
+        if (g_file_test(css_paths[i], G_FILE_TEST_EXISTS)) {
+            if (gtk_css_provider_load_from_path(provider, css_paths[i], NULL)) {
+                loaded = TRUE;
+                break;
+            }
+        }
+    }
+
+    if (!loaded) {
+        g_warning("Could not load 'style.css'. The appearance may be incorrect.");
+        g_object_unref(provider);
+        return;
+    }
     
     GdkScreen *screen = gtk_widget_get_screen(window);
     gtk_style_context_add_provider_for_screen(screen,
@@ -226,8 +144,8 @@ void gui_log(AppContext *app, const char *fmt, ...){
 static gboolean gui_update_started(gpointer ud){
     AppContext *app = (AppContext*)ud;
     gtk_widget_set_sensitive(app->btn_stop, TRUE);
-    gtk_label_set_text(GTK_LABEL(app->status_label), "🚀 Rodando...");
-    gui_log(app, "[GUI] Teste iniciado: threads=%d mem/thread=%zu dur=%ds pin=%d\n",
+    gtk_label_set_text(GTK_LABEL(app->status_label), "🚀 Running...");
+    gui_log(app, "[GUI] Test started: threads=%d mem/thread=%zu dur=%ds pin=%d\n",
             app->threads, app->mem_mib_per_thread, app->duration_sec, app->pin_affinity);
     return G_SOURCE_REMOVE;
 }
@@ -236,8 +154,8 @@ gboolean gui_update_stopped(gpointer ud){
     AppContext *app = (AppContext*)ud;
     set_controls_sensitive(app, TRUE);
     gtk_widget_set_sensitive(app->btn_stop, FALSE);
-    gtk_label_set_text(GTK_LABEL(app->status_label), "⏹ Parado");
-    gui_log(app, "[GUI] Teste parado.\n");
+    gtk_label_set_text(GTK_LABEL(app->status_label), "⏹ Stopped");
+    gui_log(app, "[GUI] Test stopped.\n");
     return G_SOURCE_REMOVE;
 }
 
@@ -248,11 +166,11 @@ static void on_btn_start_clicked(GtkButton *b, gpointer ud){
 
     char *end;
     long threads = strtol(gtk_entry_get_text(GTK_ENTRY(app->entry_threads)), &end, 10);
-    if (*end != '\0' || threads < 0){ gui_log(app, "[GUI] threads invalido\n"); return; }
+    if (*end != '\0' || threads < 0){ gui_log(app, "[GUI] Invalid threads\n"); return; }
     long mem = strtol(gtk_entry_get_text(GTK_ENTRY(app->entry_mem)), &end, 10);
-    if (*end != '\0' || mem <= 0){ gui_log(app, "[GUI] memoria invalida\n"); return; }
+    if (*end != '\0' || mem <= 0){ gui_log(app, "[GUI] Invalid memory\n"); return; }
     long dur = strtol(gtk_entry_get_text(GTK_ENTRY(app->entry_dur)), &end, 10);
-    if (*end != '\0' || dur < 0){ gui_log(app, "[GUI] duracao invalida\n"); return; }
+    if (*end != '\0' || dur < 0){ gui_log(app, "[GUI] Invalid duration\n"); return; }
 
     app->threads = (threads == 0) ? detect_cpu_count() : (int)threads;
     app->mem_mib_per_thread = (size_t)mem;
@@ -265,7 +183,7 @@ static void on_btn_start_clicked(GtkButton *b, gpointer ud){
     app->csv_realtime_en = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_csv_realtime));
 
     if (!app->kernel_fpu_en && !app->kernel_int_en && !app->kernel_stream_en && !app->kernel_ptr_en) {
-        gui_log(app, "[GUI] ERRO: Pelo menos um kernel de stress deve ser selecionado.\n");
+        gui_log(app, "[GUI] ERROR: At least one stress kernel must be selected.\n");
         return;
     }
 
@@ -280,7 +198,7 @@ static void on_btn_stop_clicked(GtkButton *b, gpointer ud){
     if (!atomic_load(&app->running)) return;
     atomic_store(&app->running, 0);
     gtk_widget_set_sensitive(app->btn_stop, FALSE);
-    gui_log(app, "[GUI] Parada solicitada pelo usuário\n");
+    gui_log(app, "[GUI] Stop requested by user\n");
 }
 
 static void on_btn_export_clicked(GtkButton *b, gpointer ud){
@@ -293,7 +211,7 @@ static gboolean on_window_delete(GtkWidget *w, GdkEvent *e, gpointer ud){
     (void)w; (void)e;
     AppContext *app = (AppContext*)ud;
     if (atomic_load(&app->running)){
-        gui_log(app, "[GUI] Fechando: solicitando parada...\n");
+        gui_log(app, "[GUI] Closing: requesting stop...\n");
         atomic_store(&app->running, 0);
         struct timespec r = {1, 500000000}; nanosleep(&r,NULL);
     }
@@ -303,8 +221,8 @@ static gboolean on_window_delete(GtkWidget *w, GdkEvent *e, gpointer ud){
 static gboolean ui_tick(gpointer ud){
     AppContext *app = (AppContext*)ud;
     if (!atomic_load(&app->running)) {
-        if (strcmp(gtk_label_get_text(GTK_LABEL(app->status_label)), "⏹ Parado") != 0) {
-            gtk_label_set_text(GTK_LABEL(app->status_label), "⏹ Parado");
+        if (strcmp(gtk_label_get_text(GTK_LABEL(app->status_label)), "⏹ Stopped") != 0) {
+            gtk_label_set_text(GTK_LABEL(app->status_label), "⏹ Stopped");
         }
         return TRUE;
     }
@@ -313,7 +231,7 @@ static gboolean ui_tick(gpointer ud){
     unsigned long long diff = cur - last_total;
     last_total = cur;
     char buf[256];
-    snprintf(buf, sizeof(buf), "⚡ Performance: %llu iters/s | Erros: %d", diff, atomic_load(&app->errors));
+    snprintf(buf, sizeof(buf), "⚡ Performance: %llu iters/s | Errors: %d", diff, atomic_load(&app->errors));
     gtk_label_set_text(GTK_LABEL(app->status_label), buf);
     return TRUE;
 }
@@ -339,13 +257,13 @@ GtkWidget* create_main_window(AppContext *app) {
     GtkWidget *title = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(title), 
         "<span font='Inter Bold 18' foreground='#00bfff'>HardStress</span>\n"
-        "<span font='Inter 10' foreground='#a0a0a0'>Sistema de Teste de Estresse</span>");
+        "<span font='Inter 10' foreground='#a0a0a0'>Stress Testing System</span>");
     gtk_label_set_justify(GTK_LABEL(title), GTK_JUSTIFY_LEFT);
     gtk_widget_set_halign(title, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(sidebar), title, FALSE, FALSE, 0);
 
     // Frame de Configurações
-    GtkWidget *config_frame = gtk_frame_new("Configurações");
+    GtkWidget *config_frame = gtk_frame_new("Settings");
     GtkWidget *config_grid = gtk_grid_new();
     gtk_grid_set_row_spacing(GTK_GRID(config_grid), 12);
     gtk_grid_set_column_spacing(GTK_GRID(config_grid), 12);
@@ -361,38 +279,38 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_grid_attach(GTK_GRID(config_grid), threads_label, 0, row, 1, 1);
     app->entry_threads = gtk_entry_new();
     gtk_entry_set_text(GTK_ENTRY(app->entry_threads), "0");
-    gtk_entry_set_placeholder_text(GTK_ENTRY(app->entry_threads), "Número de threads");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(app->entry_threads), "Number of threads");
     gtk_grid_attach(GTK_GRID(config_grid), app->entry_threads, 1, row++, 1, 1);
 
     // Memória
-    GtkWidget *mem_label = gtk_label_new("Memória (MiB/thread):");
+    GtkWidget *mem_label = gtk_label_new("Memory (MiB/thread):");
     gtk_widget_set_halign(mem_label, GTK_ALIGN_START);
     gtk_grid_attach(GTK_GRID(config_grid), mem_label, 0, row, 1, 1);
     app->entry_mem = gtk_entry_new();
     char mem_buf[32]; snprintf(mem_buf, sizeof(mem_buf), "%zu", app->mem_mib_per_thread);
     gtk_entry_set_text(GTK_ENTRY(app->entry_mem), mem_buf);
-    gtk_entry_set_placeholder_text(GTK_ENTRY(app->entry_mem), "Memória por thread");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(app->entry_mem), "Memory per thread");
     gtk_grid_attach(GTK_GRID(config_grid), app->entry_mem, 1, row++, 1, 1);
 
     // Duração
-    GtkWidget *dur_label = gtk_label_new("Duração (s, 0=∞):");
+    GtkWidget *dur_label = gtk_label_new("Duration (s, 0=∞):");
     gtk_widget_set_halign(dur_label, GTK_ALIGN_START);
     gtk_grid_attach(GTK_GRID(config_grid), dur_label, 0, row, 1, 1);
     app->entry_dur = gtk_entry_new();
     char dur_buf[32]; snprintf(dur_buf, sizeof(dur_buf), "%d", app->duration_sec);
     gtk_entry_set_text(GTK_ENTRY(app->entry_dur), dur_buf);
-    gtk_entry_set_placeholder_text(GTK_ENTRY(app->entry_dur), "Tempo em segundos");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(app->entry_dur), "Time in seconds");
     gtk_grid_attach(GTK_GRID(config_grid), app->entry_dur, 1, row++, 1, 1);
 
     // Frame de Kernels
-    GtkWidget *kernel_frame = gtk_frame_new("Kernels de Stress");
+    GtkWidget *kernel_frame = gtk_frame_new("Stress Kernels");
     GtkWidget *kernel_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     gtk_container_set_border_width(GTK_CONTAINER(kernel_box), 10);
     gtk_container_add(GTK_CONTAINER(kernel_frame), kernel_box);
     gtk_box_pack_start(GTK_BOX(sidebar), kernel_frame, FALSE, FALSE, 0);
 
-    app->check_fpu = gtk_check_button_new_with_label("FPU (Ponto Flutuante)");
-    app->check_int = gtk_check_button_new_with_label("ALU (Inteiros)");
+    app->check_fpu = gtk_check_button_new_with_label("FPU (Floating Point)");
+    app->check_int = gtk_check_button_new_with_label("ALU (Integers)");
     app->check_stream = gtk_check_button_new_with_label("Memory Stream");
     app->check_ptr = gtk_check_button_new_with_label("Pointer Chasing");
     
@@ -407,14 +325,14 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_box_pack_start(GTK_BOX(kernel_box), app->check_ptr, FALSE, FALSE, 0);
 
     // Opções adicionais
-    GtkWidget *options_frame = gtk_frame_new("Opções");
+    GtkWidget *options_frame = gtk_frame_new("Options");
     GtkWidget *options_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     gtk_container_set_border_width(GTK_CONTAINER(options_box), 10);
     gtk_container_add(GTK_CONTAINER(options_frame), options_box);
     gtk_box_pack_start(GTK_BOX(sidebar), options_frame, FALSE, FALSE, 0);
 
-    app->check_pin = gtk_check_button_new_with_label("Fixar threads em CPUs");
-    app->check_csv_realtime = gtk_check_button_new_with_label("Log CSV em tempo real");
+    app->check_pin = gtk_check_button_new_with_label("Pin threads to CPUs");
+    app->check_csv_realtime = gtk_check_button_new_with_label("Real-time CSV Log");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_pin), TRUE);
     
     gtk_box_pack_start(GTK_BOX(options_box), app->check_pin, FALSE, FALSE, 0);
@@ -422,19 +340,19 @@ GtkWidget* create_main_window(AppContext *app) {
 
     // Botões de controle
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-    app->btn_start = gtk_button_new_with_label("▶ Iniciar");
-    app->btn_stop = gtk_button_new_with_label("⏹ Parar");
+    app->btn_start = gtk_button_new_with_label("▶ Start");
+    app->btn_stop = gtk_button_new_with_label("⏹ Stop");
     gtk_widget_set_sensitive(app->btn_stop, FALSE);
     
     gtk_box_pack_start(GTK_BOX(button_box), app->btn_start, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(button_box), app->btn_stop, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(sidebar), button_box, FALSE, FALSE, 0);
 
-    app->btn_export = gtk_button_new_with_label("📊 Exportar CSV");
+    app->btn_export = gtk_button_new_with_label("📊 Export CSV");
     gtk_box_pack_start(GTK_BOX(sidebar), app->btn_export, FALSE, FALSE, 0);
 
     // Status
-    app->status_label = gtk_label_new("⏹ Pronto");
+    app->status_label = gtk_label_new("⏹ Ready");
     gtk_style_context_add_class(gtk_widget_get_style_context(app->status_label), "status-label");
     gtk_box_pack_start(GTK_BOX(sidebar), app->status_label, FALSE, FALSE, 0);
 
@@ -444,21 +362,21 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_box_pack_start(GTK_BOX(main_box), main_area, TRUE, TRUE, 0);
 
     // Gráfico de CPU
-    GtkWidget *cpu_frame = gtk_frame_new("Utilização de CPU por Core");
+    GtkWidget *cpu_frame = gtk_frame_new("CPU Utilization per Core");
     app->cpu_drawing = gtk_drawing_area_new();
     gtk_widget_set_size_request(app->cpu_drawing, -1, 150);
     gtk_container_add(GTK_CONTAINER(cpu_frame), app->cpu_drawing);
     gtk_box_pack_start(GTK_BOX(main_area), cpu_frame, FALSE, FALSE, 0);
 
     // Gráfico de Iterações
-    GtkWidget *iters_frame = gtk_frame_new("Performance por Thread (Iterações/s)");
+    GtkWidget *iters_frame = gtk_frame_new("Performance per Thread (Iterations/s)");
     app->iters_drawing = gtk_drawing_area_new();
     gtk_widget_set_size_request(app->iters_drawing, -1, 300);
     gtk_container_add(GTK_CONTAINER(iters_frame), app->iters_drawing);
     gtk_box_pack_start(GTK_BOX(main_area), iters_frame, FALSE, FALSE, 0);
 
     // Log
-    GtkWidget *log_frame = gtk_frame_new("Log de Sistema");
+    GtkWidget *log_frame = gtk_frame_new("System Log");
     GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled), 
                                      GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
@@ -499,11 +417,11 @@ static void set_controls_sensitive(AppContext *app, gboolean state){
 }
 
 static void export_csv_dialog(AppContext *app){
-    GtkWidget *dialog = gtk_file_chooser_dialog_new("Exportar Histórico para CSV", 
+    GtkWidget *dialog = gtk_file_chooser_dialog_new("Export History to CSV",
         GTK_WINDOW(app->win),
         GTK_FILE_CHOOSER_ACTION_SAVE, 
-        "_Cancelar", GTK_RESPONSE_CANCEL, 
-        "_Salvar", GTK_RESPONSE_ACCEPT, NULL);
+        "_Cancel", GTK_RESPONSE_CANCEL,
+        "_Save", GTK_RESPONSE_ACCEPT, NULL);
 
     char default_name[64];
     snprintf(default_name, sizeof(default_name), "HardStress_Export_%.0f.csv", (double)time(NULL));
@@ -513,7 +431,7 @@ static void export_csv_dialog(AppContext *app){
         char *fname = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
         FILE *f = fopen(fname, "w");
         if (!f){
-            gui_log(app, "[GUI] ERRO: Falha ao abrir %s para escrita\n", fname);
+            gui_log(app, "[GUI] ERROR: Failed to open %s for writing\n", fname);
             g_free(fname);
             gtk_widget_destroy(dialog);
             return;
@@ -537,7 +455,7 @@ static void export_csv_dialog(AppContext *app){
         g_mutex_unlock(&app->history_mutex);
 
         fclose(f);
-        gui_log(app, "[GUI] CSV (snapshot da memória) exportado para %s\n", fname);
+        gui_log(app, "[GUI] CSV (memory snapshot) exported to %s\n", fname);
         g_free(fname);
     }
     gtk_widget_destroy(dialog);
@@ -659,9 +577,9 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
             cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
             cairo_set_font_size(cr, 16);
             cairo_text_extents_t extents;
-            cairo_text_extents(cr, "FALHA DE ALOCAÇÃO", &extents);
+            cairo_text_extents(cr, "ALLOCATION FAILURE", &extents);
             cairo_move_to(cr, W/2.0 - extents.width/2.0, H/2.0 + extents.height/2.0);
-            cairo_show_text(cr, "FALHA DE ALOCAÇÃO");
+            cairo_show_text(cr, "ALLOCATION FAILURE");
             break; // Mostra apenas a falha
         }
         
