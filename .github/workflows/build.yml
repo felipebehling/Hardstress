@@ -40,24 +40,45 @@ jobs:
         run: |
           make release CC=x86_64-w64-mingw32-gcc TARGET=HardStress.exe
 
-      - name: Prepare Artifact Name
-        id: artifact_name
-        shell: bash
+      - name: Package Application (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            echo "NAME=HardStress-windows" >> $GITHUB_ENV
-            echo "FILE=HardStress.exe" >> $GITHUB_ENV
-          else
-            echo "NAME=HardStress-linux" >> $GITHUB_ENV
-            echo "FILE=HardStress" >> $GITHUB_ENV
-          fi
+          tar -czvf HardStress-linux.tar.gz HardStress
 
-      - name: Upload artifact
+      - name: Upload Linux Artifact
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.NAME }}
-          path: ${{ env.FILE }}
+          name: HardStress-linux
+          path: HardStress-linux.tar.gz
 
+      - name: Package Application (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          set -e
+          ARTIFACT_DIR="HardStress-windows"
+          mkdir $ARTIFACT_DIR
+          mv HardStress.exe $ARTIFACT_DIR/
+          
+          # Usa ldd para encontrar e copiar todas as dependências .dll necessárias
+          # O grep filtra para pegar apenas as bibliotecas do ambiente mingw64
+          ldd $ARTIFACT_DIR/HardStress.exe | grep -o '/mingw64/bin/[^ ]*\.dll' | sort -u | xargs -I{} cp {} $ARTIFACT_DIR/
+          
+          echo "DLLs empacotadas com sucesso."
+
+      - name: Create Zip Archive (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Compress-Archive -Path HardStress-windows -DestinationPath HardStress-windows.zip
+
+      - name: Upload Windows Artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: HardStress-windows
+          path: HardStress-windows.zip
+          
   release:
     needs: [build]
     runs-on: ubuntu-latest
@@ -70,6 +91,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: artifacts/**/*/* # Modificado para pegar os arquivos dentro dos diretórios
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
