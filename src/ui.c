@@ -3,6 +3,8 @@
 #include "core.h"
 #include "metrics.h"
 #include "utils.h"
+#include <math.h>
+#include <time.h>
 
 /* --- Definições de Cores do Tema Escuro --- */
 typedef struct {
@@ -10,16 +12,16 @@ typedef struct {
 } rgba_t;
 
 // Paleta de cores moderna inspirada no KDE Plasma
-static const rgba_t THEME_BG_PRIMARY = {0.118, 0.118, 0.180, 1.0};      // rgb(30, 30, 46) - Fundo principal
-static const rgba_t THEME_BG_SECONDARY = {0.157, 0.157, 0.227, 1.0};    // rgb(40, 40, 58) - Painéis
-static const rgba_t THEME_BG_TERTIARY = {0.196, 0.196, 0.274, 1.0};     // rgb(50, 50, 74) - Elementos elevados
-static const rgba_t THEME_ACCENT = {0.0, 0.749, 1.0, 1.0};              // rgb(0, 191, 255) - Azul ciano vibrante
-static const rgba_t THEME_ACCENT_DIM = {0.0, 0.498, 0.667, 1.0};        // rgb(0, 127, 170) - Azul mais escuro
-static const rgba_t THEME_WARN = {0.976, 0.886, 0.686, 1.0};            // rgb(249, 226, 175) - Âmbar/Laranja
-static const rgba_t THEME_ERROR = {0.949, 0.561, 0.678, 1.0};           // rgb(242, 143, 173) - Vermelho claro
-static const rgba_t THEME_SUCCESS = {0.565, 0.933, 0.565, 1.0};         // rgb(144, 238, 144) - Verde claro
-static const rgba_t THEME_TEXT_PRIMARY = {0.878, 0.878, 0.878, 1.0};    // rgb(224, 224, 224) - Texto principal
-static const rgba_t THEME_TEXT_SECONDARY = {0.627, 0.627, 0.627, 1.0};  // rgb(160, 160, 160) - Texto secundário
+static const rgba_t THEME_BG_PRIMARY = {0.118, 0.118, 0.180, 1.0};      // #1e1e2e - Fundo principal
+static const rgba_t THEME_BG_SECONDARY = {0.157, 0.157, 0.227, 1.0};    // #28283a - Painéis
+static const rgba_t THEME_BG_TERTIARY = {0.196, 0.196, 0.274, 1.0};     // #32324a - Elementos elevados
+static const rgba_t THEME_ACCENT = {0.0, 0.749, 1.0, 1.0};              // #00bfff - Azul ciano vibrante
+static const rgba_t THEME_ACCENT_DIM = {0.0, 0.498, 0.667, 1.0};        // #007faa - Azul mais escuro
+static const rgba_t THEME_WARN = {0.976, 0.886, 0.686, 1.0};            // #f9e2af - Âmbar/Laranja
+static const rgba_t THEME_ERROR = {0.949, 0.561, 0.678, 1.0};           // #f28fad - Vermelho claro
+static const rgba_t THEME_SUCCESS = {0.565, 0.933, 0.565, 1.0};         // #90ee90 - Verde claro
+static const rgba_t THEME_TEXT_PRIMARY = {0.878, 0.878, 0.878, 1.0};    // #e0e0e0 - Texto principal
+static const rgba_t THEME_TEXT_SECONDARY = {0.627, 0.627, 0.627, 1.0}; // #a0a0a0 - Texto secundário
 static const rgba_t THEME_GRID = {0.235, 0.235, 0.314, 0.5};            // Grade sutil
 
 /* --- Protótipos de Funções Estáticas --- */
@@ -41,98 +43,109 @@ static void draw_grid_background(cairo_t *cr, int width, int height, int spacing
 gboolean gui_update_stopped(gpointer ud);
 
 /* --- CSS do Tema Moderno --- */
-static const char *css_theme =
+static const char *css_theme = 
     "window {"
-    "  background-color: rgb(30, 30, 46);"
+    "  background-color: #1e1e2e;"
     "}"
     "label {"
-    "  color: rgb(224, 224, 224);"
-    "  font-family: 'Inter', 'Noto Sans', 'Segoe UI', sans-serif;"
+    "  color: #e0e0e0;"
+    "  font-family: 'Inter', 'Noto Sans', sans-serif;"
     "  font-size: 11px;"
     "}"
     "entry {"
-    "  background-color: rgb(50, 50, 74);"
-    "  color: rgb(224, 224, 224);"
-    "  border: 1px solid rgba(0, 191, 255, 0.25);"
+    "  background-color: #32324a;"
+    "  color: #e0e0e0;"
+    "  border: 1px solid #00bfff40;"
     "  border-radius: 6px;"
     "  padding: 8px;"
-    "  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;"
+    "  font-family: 'JetBrains Mono', 'Fira Code', monospace;"
     "  font-size: 11px;"
+    "  transition: all 0.3s ease;"
     "}"
     "entry:focus {"
-    "  border-color: rgb(0, 191, 255);"
-    "  box-shadow: 0 0 0 2px rgba(0, 191, 255, 0.125);"
+    "  border-color: #00bfff;"
+    "  box-shadow: 0 0 0 2px #00bfff20;"
     "}"
     "button {"
-    "  background-color: rgb(40, 40, 58);"
-    "  color: rgb(224, 224, 224);"
-    "  border: 1px solid rgba(0, 191, 255, 0.25);"
+    "  background: linear-gradient(135deg, #32324a, #28283a);"
+    "  color: #e0e0e0;"
+    "  border: 1px solid #00bfff40;"
     "  border-radius: 6px;"
     "  padding: 10px 20px;"
-    "  font-family: 'Inter', 'Noto Sans', 'Segoe UI', sans-serif;"
+    "  font-family: 'Inter', 'Noto Sans', sans-serif;"
     "  font-weight: 500;"
     "  font-size: 12px;"
+    "  transition: all 0.3s ease;"
     "}"
     "button:hover {"
-    "  background-color: rgb(0, 191, 255);"
-    "  border-color: rgb(0, 191, 255);"
-    "  box-shadow: 0 4px 12px rgba(0, 191, 255, 0.25);"
+    "  background: linear-gradient(135deg, #00bfff, #007faa);"
+    "  border-color: #00bfff;"
+    "  box-shadow: 0 4px 12px #00bfff40;"
     "}"
     "button:disabled {"
-    "  background-color: rgb(40, 40, 58);"
-    "  color: rgb(96, 96, 96);"
-    "  border-color: rgb(64, 64, 64);"
+    "  background: #28283a;"
+    "  color: #606060;"
+    "  border-color: #404040;"
+    "}"
+    "checkbutton {"
+    "  color: #e0e0e0;"
+    "  font-family: 'Inter', 'Noto Sans', sans-serif;"
+    "  font-size: 11px;"
     "}"
     "checkbutton check {"
-    "  background-color: rgb(50, 50, 74);"
-    "  border: 2px solid rgba(0, 191, 255, 0.25);"
+    "  background-color: #32324a;"
+    "  border: 2px solid #00bfff40;"
     "  border-radius: 4px;"
     "  min-width: 18px;"
     "  min-height: 18px;"
     "}"
     "checkbutton check:checked {"
-    "  background-color: rgb(0, 191, 255);"
-    "  border-color: rgb(0, 191, 255);"
+    "  background: linear-gradient(135deg, #00bfff, #007faa);"
+    "  border-color: #00bfff;"
     "}"
     "frame {"
-    "  background-color: rgb(40, 40, 58);"
-    "  border: 1px solid rgba(0, 191, 255, 0.125);"
+    "  background-color: #28283a;"
+    "  border: 1px solid #00bfff20;"
     "  border-radius: 8px;"
     "  padding: 12px;"
     "}"
     "frame > label {"
-    "  color: rgb(0, 191, 255);"
+    "  color: #00bfff;"
     "  font-weight: 600;"
     "  font-size: 12px;"
     "}"
     "textview {"
-    "  background-color: rgb(30, 30, 46);"
-    "  color: rgb(144, 238, 144);"
-    "  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;"
+    "  background-color: #1e1e2e;"
+    "  color: #90ee90;"
+    "  font-family: 'JetBrains Mono', 'Fira Code', monospace;"
     "  font-size: 10px;"
     "}"
     "scrolledwindow {"
-    "  background-color: rgb(30, 30, 46);"
-    "  border: 1px solid rgba(0, 191, 255, 0.125);"
+    "  background-color: #1e1e2e;"
+    "  border: 1px solid #00bfff20;"
+    "  border-radius: 8px;"
+    "}"
+    "scrollbar {"
+    "  background-color: #28283a;"
     "  border-radius: 8px;"
     "}"
     "scrollbar slider {"
-    "  background-color: rgba(0, 191, 255, 0.25);"
+    "  background-color: #00bfff40;"
     "  border-radius: 8px;"
     "  min-width: 8px;"
     "}"
     "scrollbar slider:hover {"
-    "  background-color: rgba(0, 191, 255, 0.375);"
+    "  background-color: #00bfff60;"
     "}"
     ".status-label {"
-    "  background-color: rgb(40, 40, 58);"
-    "  border: 1px solid rgba(0, 191, 255, 0.25);"
+    "  background: linear-gradient(135deg, #32324a, #28283a);"
+    "  border: 1px solid #00bfff40;"
     "  border-radius: 8px;"
     "  padding: 12px;"
-    "  font-family: 'JetBrains Mono', 'Consolas', monospace;"
+    "  font-family: 'JetBrains Mono', monospace;"
     "  font-size: 13px;"
     "  font-weight: 600;"
-    "  color: rgb(0, 191, 255);"
+    "  color: #00bfff;"
     "}";
 
 /* --- Implementações --- */
@@ -150,15 +163,11 @@ static void apply_css_theme(GtkWidget *window) {
 }
 
 static void draw_rounded_rect(cairo_t *cr, double x, double y, double w, double h, double r) {
-    cairo_move_to(cr, x + r, y);
-    cairo_line_to(cr, x + w - r, y);
-    cairo_arc(cr, x + w - r, y + r, r, -M_PI/2, 0);
-    cairo_line_to(cr, x + w, y + h - r);
-    cairo_arc(cr, x + w - r, y + h - r, r, 0, M_PI/2);
-    cairo_line_to(cr, x + r, y + h);
-    cairo_arc(cr, x + r, y + h - r, r, M_PI/2, M_PI);
-    cairo_line_to(cr, x, y + r);
-    cairo_arc(cr, x + r, y + r, r, M_PI, 3*M_PI/2);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x + r, y + r, r, M_PI, 1.5 * M_PI);
+    cairo_arc(cr, x + w - r, y + r, r, 1.5 * M_PI, 2 * M_PI);
+    cairo_arc(cr, x + w - r, y + h - r, r, 0, 0.5 * M_PI);
+    cairo_arc(cr, x + r, y + h - r, r, 0.5 * M_PI, M_PI);
     cairo_close_path(cr);
 }
 
@@ -214,10 +223,6 @@ void gui_log(AppContext *app, const char *fmt, ...){
     gtk_text_buffer_insert(app->log_buffer, &end, " ", -1);
     gtk_text_buffer_insert(app->log_buffer, &end, s, -1);
     g_free(s);
-
-    // Auto-scroll
-    GtkAdjustment *adj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(app->log_scrolled_window));
-    gtk_adjustment_set_value(adj, gtk_adjustment_get_upper(adj));
 }
 
 static gboolean gui_update_started(gpointer ud){
@@ -456,15 +461,15 @@ GtkWidget* create_main_window(AppContext *app) {
 
     // Log
     GtkWidget *log_frame = gtk_frame_new("Log de Sistema");
-    app->log_scrolled_window = gtk_scrolled_window_new(NULL, NULL);
-    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(app->log_scrolled_window), 
+    GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled), 
                                      GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
     GtkWidget *text_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(text_view), GTK_WRAP_WORD);
     app->log_buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
-    gtk_container_add(GTK_CONTAINER(app->log_scrolled_window), text_view);
-    gtk_container_add(GTK_CONTAINER(log_frame), app->log_scrolled_window);
+    gtk_container_add(GTK_CONTAINER(scrolled), text_view);
+    gtk_container_add(GTK_CONTAINER(log_frame), scrolled);
     gtk_box_pack_start(GTK_BOX(main_area), log_frame, TRUE, TRUE, 0);
 
     // Conectar sinais
@@ -476,6 +481,7 @@ GtkWidget* create_main_window(AppContext *app) {
     g_signal_connect(app->cpu_drawing, "draw", G_CALLBACK(on_draw_cpu), app);
     g_signal_connect(app->iters_drawing, "draw", G_CALLBACK(on_draw_iters), app);
 
+    // Timer para atualizar o status
     g_timeout_add(1000, ui_tick, app);
 
     return win;
@@ -495,37 +501,40 @@ static void set_controls_sensitive(AppContext *app, gboolean state){
 }
 
 static void export_csv_dialog(AppContext *app){
-    GtkWidget *dialog = gtk_file_chooser_dialog_new("Exportar CSV", GTK_WINDOW(app->win),
-        GTK_FILE_CHOOSER_ACTION_SAVE, "_Cancelar", GTK_RESPONSE_CANCEL, "_Salvar", GTK_RESPONSE_ACCEPT, NULL);
+    GtkWidget *dialog = gtk_file_chooser_dialog_new("Exportar Histórico para CSV", 
+        GTK_WINDOW(app->win),
+        GTK_FILE_CHOOSER_ACTION_SAVE, 
+        "_Cancelar", GTK_RESPONSE_CANCEL, 
+        "_Salvar", GTK_RESPONSE_ACCEPT, NULL);
 
     char default_name[64];
-    snprintf(default_name, sizeof(default_name), "HardStress_ManualExport_%.0f.csv", (double)time(NULL));
+    snprintf(default_name, sizeof(default_name), "HardStress_Export_%.0f.csv", (double)time(NULL));
     gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), default_name);
 
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT){
         char *fname = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
         FILE *f = fopen(fname, "w");
         if (!f){
-            gui_log(app, "[GUI] Falha ao abrir %s para escrita\n", fname);
+            gui_log(app, "[GUI] ERRO: Falha ao abrir %s para escrita\n", fname);
             g_free(fname);
             gtk_widget_destroy(dialog);
             return;
         }
 
-        fprintf(f, "timestamp");
-        for (int c=0;c<app->cpu_count;c++) fprintf(f, ",cpu%d_usage", c);
-        for (int t=0;t<app->threads;t++) fprintf(f, ",thread%d_iters", t);
-        fprintf(f, ",temp_celsius\n");
+        fprintf(f, "timestamp_sec");
+        for (int t=0; t<app->threads; t++) fprintf(f, ",thread%d_iters_total", t);
+        fprintf(f, "\n");
 
         g_mutex_lock(&app->history_mutex);
-        for (int s=0;s<app->history_len;s++){
-            int idx = (app->history_pos + 1 + s) % app->history_len;
-            fprintf(f, "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
-             for (int c=0;c<app->cpu_count;c++) fprintf(f, ",-1.0"); // Placeholder for CPU usage
-            if(app->thread_history) {
-              for (int t=0;t<app->threads;t++) fprintf(f, ",%u", app->thread_history[t][idx]);
+        if(app->thread_history) {
+            for (int s=0; s<app->history_len; s++){
+                int idx = (app->history_pos + 1 + s) % app->history_len;
+                fprintf(f, "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
+                for (int t=0; t<app->threads; t++) {
+                    fprintf(f, ",%u", app->thread_history[t][idx]);
+                }
+                fprintf(f, "\n");
             }
-            fprintf(f, ",-1.0\n"); // Placeholder for temp
         }
         g_mutex_unlock(&app->history_mutex);
 
@@ -538,59 +547,79 @@ static void export_csv_dialog(AppContext *app){
 
 static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
     AppContext *app = (AppContext*)user_data;
-    GtkAllocation alloc; gtk_widget_get_allocation(widget, &alloc);
+    GtkAllocation alloc; 
+    gtk_widget_get_allocation(widget, &alloc);
     int w = alloc.width, h = alloc.height;
-    
+
+    cairo_set_antialias(cr, CAIRO_ANTIALIAS_DEFAULT);
+
     // Fundo
-    cairo_set_source_rgba(cr, THEME_BG_TERTIARY.r, THEME_BG_TERTIARY.g, THEME_BG_TERTIARY.b, 1.0);
-    cairo_paint(cr);
-    draw_grid_background(cr, w, h, 20);
+    cairo_set_source_rgba(cr, THEME_BG_SECONDARY.r, THEME_BG_SECONDARY.g, THEME_BG_SECONDARY.b, THEME_BG_SECONDARY.a);
+    draw_rounded_rect(cr, 0, 0, w, h, 8.0);
+    cairo_fill(cr);
+
+    // Grade
+    draw_grid_background(cr, w, h - 25, 20);
 
     int n = app->cpu_count > 0 ? app->cpu_count : 1;
-    double bar_width_total = (double)w / n;
-    double bar_spacing = bar_width_total * 0.2;
-    double bar_width = bar_width_total - bar_spacing;
-    double radius = bar_width / 4;
+    double spacing = 8.0;
+    double bw = (w - (n + 1) * spacing) / n;
 
     g_mutex_lock(&app->cpu_mutex);
-    for (int i=0;i<n;i++){
+    for (int i=0; i<n; i++){
         double u = (app->cpu_usage && i < app->cpu_count) ? app->cpu_usage[i] : 0.0;
-        double x = i * bar_width_total + bar_spacing / 2.0;
-        double bar_h = (u * (h - 20)); // Deixa espaço para texto abaixo
+        double x = spacing + i * (bw + spacing);
+        double bar_h = u * (h - 35); // Espaço para textos
 
-        // Desenha trilha da barra
-        cairo_set_source_rgba(cr, THEME_ACCENT_DIM.r, THEME_ACCENT_DIM.g, THEME_ACCENT_DIM.b, 0.2);
-        draw_rounded_rect(cr, x, 5, bar_width, h - 25, radius);
+        // Barra de fundo
+        cairo_set_source_rgba(cr, THEME_BG_TERTIARY.r, THEME_BG_TERTIARY.g, THEME_BG_TERTIARY.b, 0.7);
+        draw_rounded_rect(cr, x, 10, bw, h - 35, 6.0);
         cairo_fill(cr);
-
-        // Desenha preenchimento da barra
-        if (bar_h > 0) {
-            cairo_set_source_rgba(cr, THEME_ACCENT.r, THEME_ACCENT.g, THEME_ACCENT.b, 1.0);
-            draw_rounded_rect(cr, x, 5 + (h - 25 - bar_h), bar_width, bar_h, radius);
+        
+        // Barra de uso
+        if(bar_h > 0) {
+            cairo_pattern_t *pat = cairo_pattern_create_linear(x, h, x, h - bar_h);
+            cairo_pattern_add_color_stop_rgba(pat, 0, THEME_ACCENT_DIM.r, THEME_ACCENT_DIM.g, THEME_ACCENT_DIM.b, THEME_ACCENT_DIM.a);
+            cairo_pattern_add_color_stop_rgba(pat, 1, THEME_ACCENT.r, THEME_ACCENT.g, THEME_ACCENT.b, THEME_ACCENT.a);
+            cairo_set_source(cr, pat);
+            draw_rounded_rect(cr, x, (h - 25) - bar_h, bw, bar_h, 6.0);
             cairo_fill(cr);
+            cairo_pattern_destroy(pat);
         }
 
-        // Texto da porcentagem
-        char txt[32]; snprintf(txt, sizeof(txt), "%.0f%%", u*100.0);
-        cairo_set_source_rgba(cr, THEME_TEXT_PRIMARY.r, THEME_TEXT_PRIMARY.g, THEME_TEXT_PRIMARY.b, 1.0);
+        // Texto da porcentagem sobre a barra
+        char txt[32]; 
+        snprintf(txt, sizeof(txt), "%.0f%%", u * 100.0);
+        cairo_set_source_rgba(cr, THEME_TEXT_PRIMARY.r, THEME_TEXT_PRIMARY.g, THEME_TEXT_PRIMARY.b, 0.9);
         cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
         cairo_set_font_size(cr, 12);
         cairo_text_extents_t extents;
         cairo_text_extents(cr, txt, &extents);
-        cairo_move_to(cr, x + bar_width/2.0 - extents.width/2.0, h - 8);
+        cairo_move_to(cr, x + (bw / 2.0) - (extents.width / 2.0), 25); 
+        cairo_show_text(cr, txt);
+
+        // Rótulo do núcleo abaixo da barra
+        snprintf(txt, sizeof(txt), "CPU %d", i);
+        cairo_set_source_rgba(cr, THEME_TEXT_SECONDARY.r, THEME_TEXT_SECONDARY.g, THEME_TEXT_SECONDARY.b, 1.0);
+        cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_set_font_size(cr, 10);
+        cairo_text_extents(cr, txt, &extents);
+        cairo_move_to(cr, x + (bw / 2.0) - (extents.width / 2.0), h - 8);
         cairo_show_text(cr, txt);
     }
     g_mutex_unlock(&app->cpu_mutex);
 
+    // Display de Temperatura
     g_mutex_lock(&app->temp_mutex);
     double temp = app->temp_celsius;
     g_mutex_unlock(&app->temp_mutex);
 
     if (temp > TEMP_UNAVAILABLE){
-        char tbuf[64]; snprintf(tbuf, sizeof(tbuf), "🌡️ Temp: %.1f °C", temp);
+        char tbuf[64]; 
+        snprintf(tbuf, sizeof(tbuf), "🌡️ %.1f °C", temp);
         cairo_set_source_rgba(cr, THEME_WARN.r, THEME_WARN.g, THEME_WARN.b, 1.0);
         cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-        cairo_set_font_size(cr, 14);
+        cairo_set_font_size(cr, 12);
         cairo_text_extents_t extents;
         cairo_text_extents(cr, tbuf, &extents);
         cairo_move_to(cr, w - extents.width - 15, 20);
@@ -603,13 +632,25 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
     AppContext *app = (AppContext*)user_data;
     if (!atomic_load(&app->running) || !app->workers) return FALSE;
 
-    GtkAllocation alloc; gtk_widget_get_allocation(widget, &alloc);
+    GtkAllocation alloc; 
+    gtk_widget_get_allocation(widget, &alloc);
     int W = alloc.width, H = alloc.height;
+    
+    cairo_set_antialias(cr, CAIRO_ANTIALIAS_DEFAULT);
 
     // Fundo
-    cairo_set_source_rgba(cr, THEME_BG_TERTIARY.r, THEME_BG_TERTIARY.g, THEME_BG_TERTIARY.b, 1.0);
-    cairo_paint(cr);
+    cairo_set_source_rgba(cr, THEME_BG_SECONDARY.r, THEME_BG_SECONDARY.g, THEME_BG_SECONDARY.b, THEME_BG_SECONDARY.a);
+    draw_rounded_rect(cr, 0, 0, W, H, 8.0);
+    cairo_fill(cr);
+    
+    // Grade
     draw_grid_background(cr, W, H, 30);
+
+    const rgba_t thread_colors[] = {
+        {0.2, 0.6, 1.0, 0.8}, {0.1, 0.9, 0.7, 0.8}, {1.0, 0.8, 0.2, 0.8}, {0.9, 0.3, 0.4, 0.8},
+        {0.6, 0.4, 1.0, 0.8}, {0.2, 0.9, 0.2, 0.8}, {1.0, 0.5, 0.1, 0.8}, {0.9, 0.1, 0.8, 0.8}
+    };
+    const int num_colors = sizeof(thread_colors) / sizeof(rgba_t);
 
     g_mutex_lock(&app->history_mutex);
     for (int t=0; t < app->threads; t++){
@@ -620,59 +661,57 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
             cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
             cairo_set_font_size(cr, 16);
             cairo_text_extents_t extents;
-            cairo_text_extents(cr, "ALLOC FAILED", &extents);
-            cairo_move_to(cr, W/2.0 - extents.width/2.0, H/2.0);
-            cairo_show_text(cr, "ALLOC FAILED");
-        } else {
-            // Escolhe uma cor para a linha do gráfico baseada no ID da thread
-            double hue = fmod(t * 0.1, 1.0);
-            cairo_hsv_to_rgb(hue, 0.8, 0.9, &THEME_ACCENT.r, &THEME_ACCENT.g, &THEME_ACCENT.b);
-            cairo_set_source_rgba(cr, THEME_ACCENT.r, THEME_ACCENT.g, THEME_ACCENT.b, 0.9);
-            
-            cairo_set_line_width(cr, 2.0);
-            cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
-            int samples = app->history_len;
-            double step = (samples > 1) ? ((double)W / (samples - 1)) : W;
-
-            int start_idx = (app->history_pos + 1) % samples;
-            unsigned last_v = app->thread_history ? app->thread_history[t][start_idx] : 0;
-            
-            double max_y_val = 0;
-            for(int s=0; s<samples; s++){
-                int current_idx = (start_idx + s) % samples;
-                unsigned current_v = app->thread_history ? app->thread_history[t][current_idx] : 0;
-                double y_val = ((double)(current_v - last_v));
-                 if(y_val > max_y_val) max_y_val = y_val;
-                last_v = current_v;
-            }
-             if(max_y_val < 1) max_y_val = ITER_SCALE;
-
-            last_v = app->thread_history ? app->thread_history[t][start_idx] : 0;
-
-            for (int s = 0; s < samples; s++) {
-                int current_idx = (start_idx + s) % samples;
-                unsigned current_v = app->thread_history ? app->thread_history[t][current_idx] : 0;
-
-                double y_val = ((double)(current_v - last_v));
-                double y = H - (y_val / max_y_val) * H;
-                if (y < 0) y = 0; else if (y > H) y = H;
-
-                if (s == 0) cairo_move_to(cr, s * step, y);
-                else cairo_line_to(cr, s * step, y);
-
-                last_v = current_v;
-            }
-            cairo_stroke(cr);
+            cairo_text_extents(cr, "FALHA DE ALOCAÇÃO", &extents);
+            cairo_move_to(cr, W/2.0 - extents.width/2.0, H/2.0 + extents.height/2.0);
+            cairo_show_text(cr, "FALHA DE ALOCAÇÃO");
+            break; // Mostra apenas a falha
         }
+        
+        const rgba_t c = thread_colors[t % num_colors];
+        cairo_set_source_rgba(cr, c.r, c.g, c.b, c.a);
+        cairo_set_line_width(cr, 2.5);
+        cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+        
+        int samples = app->history_len;
+        double step_x = (samples > 1) ? ((double)W / (samples - 1)) : W;
+        int start_idx = (app->history_pos + 1) % samples;
+        unsigned last_v = app->thread_history ? app->thread_history[t][start_idx] : 0;
+        
+        cairo_move_to(cr, -10, H + 10); // Inicia fora da tela
 
-        // Legenda da thread
-        cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-        cairo_set_font_size(cr, 11);
-        cairo_move_to(cr, 10, 15 + t * 15);
-        char lbl[64]; snprintf(lbl, sizeof(lbl), "Thread %02d", t);
-        cairo_show_text(cr, lbl);
+        for (int s = 0; s < samples; s++) {
+            int current_idx = (start_idx + s) % samples;
+            unsigned current_v = app->thread_history ? app->thread_history[t][current_idx] : 0;
+            unsigned diff = (current_v > last_v) ? (current_v - last_v) : 0;
+            
+            // Normaliza o valor para a altura do gráfico
+            double y_val = ((double)diff) / (ITER_SCALE * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
+            double y = H - y_val * H;
+            y = (y < 0) ? 0 : y;
+            y = (y > H) ? H : y;
+            
+            cairo_line_to(cr, s * step_x, y);
+            last_v = current_v;
+        }
+        cairo_stroke(cr);
     }
     g_mutex_unlock(&app->history_mutex);
+
+    // Legenda
+    for (int t=0; t < app->threads; t++) {
+        const rgba_t c = thread_colors[t % num_colors];
+        cairo_set_source_rgba(cr, c.r, c.g, c.b, c.a);
+        cairo_rectangle(cr, 15, 15 + t * 20, 12, 12);
+        cairo_fill(cr);
+
+        char lbl[32];
+        snprintf(lbl, sizeof(lbl), "Thread %d", t);
+        cairo_set_source_rgba(cr, THEME_TEXT_PRIMARY.r, THEME_TEXT_PRIMARY.g, THEME_TEXT_PRIMARY.b, 1.0);
+        cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_set_font_size(cr, 11);
+        cairo_move_to(cr, 35, 25 + t * 20);
+        cairo_show_text(cr, lbl);
+    }
+    
     return FALSE;
 }
-
