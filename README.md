@@ -98,6 +98,22 @@ The project includes a `Makefile` that automates the compilation process.
 
 For convenience, a GitHub Actions workflow automatically builds and packages the application for both Linux and Windows upon every new version tag. These binaries are available for download from the "Releases" section of the GitHub repository.
 
+### 4.4. Important Note for Windows Users
+
+When downloading and attempting to run the pre-compiled version for Windows, it is likely that Windows Defender SmartScreen will display a security alert, preventing immediate execution.
+
+**Why does this happen?**
+This alert is a standard Windows security measure for applications from unrecognized developers. As this is an open-source project and the executable is not digitally signed with an expensive certificate, Windows has no way to verify its origin and treats it with caution.
+
+**Is the program safe?**
+Yes. The source code is fully available in this repository for auditing. The executable in the Release is compiled directly from this source code through an automated and public process (GitHub Actions).
+
+**How to run the program?**
+1.  Click on **"More info"** in the SmartScreen alert.
+2.  Then, the **"Run anyway"** button will appear. Click it.
+
+If you prefer not to run the pre-compiled binary, feel free to compile the project directly from the source code by following the instructions in the "Building from Source" section.
+
 ## 5\. Usage Guide
 
 1.  **Configure Parameters:**
