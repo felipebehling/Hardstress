@@ -42,115 +42,33 @@ static void draw_grid_background(cairo_t *cr, int width, int height, int spacing
 
 gboolean gui_update_stopped(gpointer ud);
 
-/* --- CSS do Tema Moderno --- */
-static const char *css_theme = 
-    "window {"
-    "  background-color: #1e1e2e;"
-    "}"
-    "label {"
-    "  color: #e0e0e0;"
-    "  font-family: 'Noto Sans', sans-serif;"
-    "  font-size: 12px;"
-    "}"
-    "entry {"
-    "  background-color: #32324a;"
-    "  color: #e0e0e0;"
-    "  border: 1px solid rgba(0,191,255,0.25);"  /* #00bfff40 */
-    "  border-radius: 6px;"
-    "  padding: 8px;"
-    "  font-family: 'JetBrains Mono', 'Fira Code', monospace;"
-    "  font-size: 11px;"
-    "}"
-    "entry:focus {"
-    "  border-color: #00bfff;"
-    "  box-shadow: 0 0 0 2px rgba(0,191,255,0.125);" /* #00bfff20 */
-    "}"
-    "button {"
-    "  background-color: #32324a;" /* sólido no lugar do gradiente */
-    "  color: #000000;"
-    "  border: 1px solid rgba(0,191,255,0.25);"  /* #00bfff40 */
-    "  border-radius: 6px;"
-    "  padding: 10px 20px;"
-    "  font-family: 'Noto Sans', sans-serif;"
-    "  font-weight: 500;"
-    "  font-size: 16px;"
-    "}"
-    "button:hover {"
-    "  background-color: #00bfff;" /* sólido no lugar do gradiente */
-    "  border-color: #00bfff;"
-    "  box-shadow: 0 4px 12px rgba(0,191,255,0.25);" /* #00bfff40 */
-    "}"
-    "button:disabled {"
-    "  background: #28283a;"
-    "  color: #606060;"
-    "  border-color: #404040;"
-    "}"
-    "checkbutton {"
-    "  color: #e0e0e0;"
-    "  font-family: 'Noto Sans', sans-serif;"
-    "  font-size: 11px;"
-    "}"
-    "checkbutton check {"
-    "  background-color: #32324a;"
-    "  border: 2px solid rgba(0,191,255,0.25);" /* #00bfff40 */
-    "  border-radius: 4px;"
-    "  min-width: 18px;"
-    "  min-height: 18px;"
-    "}"
-    "checkbutton check:checked {"
-    "  background-color: #00bfff;" /* sólido no lugar do gradiente */
-    "  border-color: #00bfff;"
-    "}"
-    "frame {"
-    "  background-color: #28283a;"
-    "  border: 1px solid rgba(0,191,255,0.125);" /* #00bfff20 */
-    "  border-radius: 8px;"
-    "  padding: 12px;"
-    "}"
-    "frame > label {"
-    "  color: #00bfff;"
-    "  font-weight: 600;"
-    "  font-size: 12px;"
-    "}"
-    "textview {"
-    "  background-color: #1e1e2e;"
-    "  color: #90ee90;"
-    "  font-family: 'JetBrains Mono', 'Fira Code', monospace;"
-    "  font-size: 10px;"
-    "}"
-    "scrolledwindow {"
-    "  background-color: #1e1e2e;"
-    "  border: 1px solid rgba(0,191,255,0.125);" /* #00bfff20 */
-    "  border-radius: 8px;"
-    "}"
-    "scrollbar {"
-    "  background-color: #28283a;"
-    "  border-radius: 8px;"
-    "}"
-    "scrollbar slider {"
-    "  background-color: rgba(0,191,255,0.25);" /* #00bfff40 */
-    "  border-radius: 8px;"
-    "  min-width: 8px;"
-    "}"
-    "scrollbar slider:hover {"
-    "  background-color: rgba(0,191,255,0.375);" /* #00bfff60 */
-    "}"
-    ".status-label {"
-    "  background-color: #32324a;" /* sólido no lugar do gradiente */
-    "  border: 1px solid rgba(0,191,255,0.25);" /* #00bfff40 */
-    "  border-radius: 8px;"
-    "  padding: 12px;"
-    "  font-family: 'JetBrains Mono', monospace;"
-    "  font-size: 13px;"
-    "  font-weight: 600;"
-    "  color: #00bfff;"
-    "}";
-
 /* --- Implementações --- */
 
 static void apply_css_theme(GtkWidget *window) {
     GtkCssProvider *provider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(provider, css_theme, -1, NULL);
+    // Tenta carregar de múltiplos locais, incluindo o diretório de desenvolvimento
+    const char *css_paths[] = {
+        "src/style.css",
+        "style.css",
+        "/usr/share/hardstress/style.css",
+        NULL
+    };
+
+    gboolean loaded = FALSE;
+    for (int i = 0; css_paths[i] != NULL; i++) {
+        if (g_file_test(css_paths[i], G_FILE_TEST_EXISTS)) {
+            if (gtk_css_provider_load_from_path(provider, css_paths[i], NULL)) {
+                loaded = TRUE;
+                break;
+            }
+        }
+    }
+
+    if (!loaded) {
+        g_warning("Não foi possível carregar o arquivo CSS 'style.css'. A aparência pode estar incorreta.");
+        g_object_unref(provider);
+        return;
+    }
     
     GdkScreen *screen = gtk_widget_get_screen(window);
     gtk_style_context_add_provider_for_screen(screen,
@@ -423,7 +341,9 @@ GtkWidget* create_main_window(AppContext *app) {
     // Botões de controle
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     app->btn_start = gtk_button_new_with_label("▶ Iniciar");
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_start), "styled-button");
     app->btn_stop = gtk_button_new_with_label("⏹ Parar");
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_stop), "styled-button");
     gtk_widget_set_sensitive(app->btn_stop, FALSE);
     
     gtk_box_pack_start(GTK_BOX(button_box), app->btn_start, TRUE, TRUE, 0);
@@ -431,6 +351,7 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_box_pack_start(GTK_BOX(sidebar), button_box, FALSE, FALSE, 0);
 
     app->btn_export = gtk_button_new_with_label("📊 Exportar CSV");
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_export), "styled-button");
     gtk_box_pack_start(GTK_BOX(sidebar), app->btn_export, FALSE, FALSE, 0);
 
     // Status
