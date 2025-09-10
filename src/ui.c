@@ -341,7 +341,9 @@ GtkWidget* create_main_window(AppContext *app) {
     // Botões de controle
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     app->btn_start = gtk_button_new_with_label("▶ Iniciar");
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_start), "styled-button");
     app->btn_stop = gtk_button_new_with_label("⏹ Parar");
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_stop), "styled-button");
     gtk_widget_set_sensitive(app->btn_stop, FALSE);
     
     gtk_box_pack_start(GTK_BOX(button_box), app->btn_start, TRUE, TRUE, 0);
@@ -349,6 +351,7 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_box_pack_start(GTK_BOX(sidebar), button_box, FALSE, FALSE, 0);
 
     app->btn_export = gtk_button_new_with_label("📊 Exportar CSV");
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_export), "styled-button");
     gtk_box_pack_start(GTK_BOX(sidebar), app->btn_export, FALSE, FALSE, 0);
 
     // Status
