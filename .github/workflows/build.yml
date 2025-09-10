@@ -1,96 +1,140 @@
-name: Build and Release
-
-on:
-  push:
-    tags:
-      - "v*.*.*"
-
-jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev
-
-      - name: Set up MSYS2 (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: msys2/setup-msys2@v2
-        with:
-          update: true
-          install: >-
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-gtk3
-            pkg-config
-          msystem: MINGW64
-
-      - name: Build (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: make release
-
-      - name: Build (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: msys2 {0}
-        run: |
-          make release CC=x86_64-w64-mingw32-gcc TARGET=HardStress.exe
-
-      - name: Package Application (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          tar -czvf HardStress-linux.tar.gz HardStress
-
-      - name: Upload Linux Artifact
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: HardStress-linux
-          path: HardStress-linux.tar.gz
-
-      - name: Package Application (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: msys2 {0}
-        run: |
-          set -e
-          ARTIFACT_DIR="HardStress-windows"
-          mkdir $ARTIFACT_DIR
-          mv HardStress.exe $ARTIFACT_DIR/
+name: Build and Release 
+ 
+on: 
+  push: 
+    tags: 
+      - "v*.*.*" 
+ 
+jobs: 
+  build: 
+    strategy: 
+      matrix: 
+        os: [ubuntu-latest, windows-latest] 
+    runs-on: ${{ matrix.os }} 
+     
+    steps: 
+      - uses: actions/checkout@v4 
+ 
+      - name: Install dependencies (Linux) 
+        if: matrix.os == 'ubuntu-latest' 
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev 
+ 
+      - name: Set up MSYS2 (Windows) 
+        if: matrix.os == 'windows-latest' 
+        uses: msys2/setup-msys2@v2 
+        with: 
+          update: true 
+          install: >- 
+            mingw-w64-x86_64-toolchain 
+            mingw-w64-x86_64-gtk3 
+            pkg-config 
+          msystem: MINGW64 
+ 
+      - name: Build (Linux) 
+        if: matrix.os == 'ubuntu-latest' 
+        run: make release 
+ 
+      - name: Build (Windows) 
+        if: matrix.os == 'windows-latest' 
+        shell: msys2 {0} 
+        run: | 
+          make release CC=x86_64-w64-mingw32-gcc TARGET=HardStress.exe 
+ 
+      - name: Package Application (Linux) 
+        if: matrix.os == 'ubuntu-latest' 
+        run: | 
+          tar -czvf HardStress-linux.tar.gz HardStress 
+ 
+      - name: Upload Linux Artifact 
+        if: matrix.os == 'ubuntu-latest' 
+        uses: actions/upload-artifact@v4 
+        with: 
+          name: HardStress-linux 
+          path: HardStress-linux.tar.gz 
+ 
+      - name: Package Application (Windows) 
+        if: matrix.os == 'windows-latest' 
+        shell: msys2 {0} 
+        run: | 
+          set -e 
+          ARTIFACT_DIR="HardStress-windows" 
+          mkdir -p $ARTIFACT_DIR 
           
-          # Usa ldd para encontrar e copiar todas as dependências .dll necessárias
-          # O grep filtra para pegar apenas as bibliotecas do ambiente mingw64
-          ldd $ARTIFACT_DIR/HardStress.exe | grep -o '/mingw64/bin/[^ ]*\.dll' | sort -u | xargs -I{} cp {} $ARTIFACT_DIR/
+          # Verifica se o executável foi criado
+          if [ ! -f "HardStress.exe" ]; then
+            echo "Erro: HardStress.exe não foi encontrado!"
+            ls -la
+            exit 1
+          fi
           
-          echo "DLLs empacotadas com sucesso."
-
-      - name: Create Zip Archive (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          Compress-Archive -Path HardStress-windows -DestinationPath HardStress-windows.zip
-
-      - name: Upload Windows Artifact
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: HardStress-windows
-          path: HardStress-windows.zip
+          # Move o executável
+          mv HardStress.exe $ARTIFACT_DIR/ 
+           
+          # Encontra e copia todas as dependências .dll necessárias 
+          echo "Copiando DLLs..."
+          ldd $ARTIFACT_DIR/HardStress.exe | grep -o '/mingw64/bin/[^ ]*\.dll' | sort -u | while read dll; do
+            if [ -f "$dll" ]; then
+              cp "$dll" $ARTIFACT_DIR/
+              echo "Copiado: $(basename $dll)"
+            fi
+          done
           
-  release:
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: artifacts/*/*
-        env:
+          echo "Conteúdo do diretório $ARTIFACT_DIR:"
+          ls -la $ARTIFACT_DIR/
+ 
+      - name: Create Zip Archive (Windows) 
+        if: matrix.os == 'windows-latest' 
+        shell: pwsh
+        run: | 
+          # Verifica se o diretório existe
+          if (!(Test-Path "HardStress-windows")) {
+            Write-Error "Diretório HardStress-windows não encontrado!"
+            Get-ChildItem -Force
+            exit 1
+          }
+          
+          # Lista o conteúdo antes de compactar
+          Write-Host "Conteúdo a ser compactado:"
+          Get-ChildItem -Path "HardStress-windows" -Recurse
+          
+          # Cria o arquivo zip
+          Compress-Archive -Path "HardStress-windows\*" -DestinationPath "HardStress-windows.zip" -Force
+          
+          # Verifica se o zip foi criado
+          if (Test-Path "HardStress-windows.zip") {
+            $zipSize = (Get-Item "HardStress-windows.zip").Length
+            Write-Host "Zip criado com sucesso! Tamanho: $zipSize bytes"
+          } else {
+            Write-Error "Falha ao criar o arquivo zip!"
+            exit 1
+          }
+ 
+      - name: Upload Windows Artifact 
+        if: matrix.os == 'windows-latest' 
+        uses: actions/upload-artifact@v4 
+        with: 
+          name: HardStress-windows 
+          path: HardStress-windows.zip 
+           
+  release: 
+    needs: [build] 
+    runs-on: ubuntu-latest 
+    steps: 
+      - name: Download artifacts 
+        uses: actions/download-artifact@v4 
+        with: 
+          path: artifacts 
+ 
+      - name: List downloaded artifacts 
+        run: | 
+          echo "Estrutura dos artifacts baixados:"
+          find artifacts -type f -exec ls -la {} \;
+ 
+      - name: Create Release 
+        uses: softprops/action-gh-release@v2 
+        with: 
+          files: | 
+            artifacts/HardStress-windows/HardStress-windows.zip 
+            artifacts/HardStress-linux/HardStress-linux.tar.gz 
+        env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
