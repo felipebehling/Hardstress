@@ -3,6 +3,7 @@
 #   make          -> build padrão no diretório raiz
 #   make clean    -> limpar
 #   make release  -> otimizado para release
+#   make watch    -> build automático ao salvar arquivos (requer 'entr')
 
 # Detecta a plataforma para adicionar a extensão correta ao executável
 TARGET = HardStress
@@ -26,8 +27,8 @@ GTK_LIBS   := $(shell $(PKG_CONFIG) --libs gtk+-3.0)
 ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -D_WIN32_DCOM -I$(SRC_DIR)
-    # MODIFICADO: Adicionada a biblioteca -loleaut32
-    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32
+    # MODIFICADO: Adicionada a flag -mwindows para ocultar o console
+    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows
 else
     # Linux/Outros
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
@@ -41,7 +42,7 @@ CFLAGS_RELEASE = -O3 -march=native -DNDEBUG
 # Define o CFLAGS padrão como debug
 CFLAGS ?= $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 
-.PHONY: all clean release
+.PHONY: all clean release watch
 
 all: $(TARGET)$(TARGET_EXT)
 
@@ -56,3 +57,11 @@ clean:
 
 release:
 	$(MAKE) all CFLAGS="$(CFLAGS_COMMON) $(CFLAGS_RELEASE)"
+
+# ADICIONADO: Novo alvo para compilação automática
+# Uso: make watch
+# Depende da ferramenta 'entr' (instale via 'pacman -S entr' no MSYS2 ou 'apt-get install entr' no Debian/Ubuntu)
+watch:
+	@echo "--> Observando arquivos .c e .h para recompilação automática..."
+	find $(SRC_DIR) -name '*.c' -o -name '*.h' | entr -c -d -r make
+
