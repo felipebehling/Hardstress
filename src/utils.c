@@ -8,7 +8,8 @@
 #include <string.h>
 #endif
 
-// Funções que não dependem do sistema operacional
+/* --- Platform-Independent Utility Functions --- */
+
 double now_sec(void){
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec*1e-9;
@@ -31,6 +32,7 @@ void shuffle32(uint32_t *a, size_t n, uint64_t *seed){
 
 unsigned long long get_total_system_memory() {
 #ifdef _WIN32
+    // On Windows, use the GlobalMemoryStatusEx function to get memory info.
     MEMORYSTATUSEX status;
     status.dwLength = sizeof(status);
     if (GlobalMemoryStatusEx(&status)) {
@@ -38,6 +40,7 @@ unsigned long long get_total_system_memory() {
     }
     return 0;
 #else
+    // On Linux, parse the MemTotal field from /proc/meminfo.
     FILE *meminfo = fopen("/proc/meminfo", "r");
     if (meminfo == NULL) {
         return 0;
@@ -48,7 +51,7 @@ unsigned long long get_total_system_memory() {
             unsigned long long total_mem_kb;
             sscanf(line + 9, "%llu", &total_mem_kb);
             fclose(meminfo);
-            return total_mem_kb * 1024;
+            return total_mem_kb * 1024; // Convert from KB to bytes
         }
     }
     fclose(meminfo);
@@ -57,29 +60,33 @@ unsigned long long get_total_system_memory() {
 }
 
 
-/* --- Implementação da Abstração de Threads --- */
+/* --- Thread Abstraction Implementation --- */
 
 #ifdef _WIN32
-// MODIFICADO: O include foi movido para dentro deste bloco #ifdef
+// Windows-specific implementation using the Win32 API
 #include <process.h> 
 
 int thread_create(thread_handle_t *t, thread_func_t func, void *arg) {
+    // _beginthreadex is the recommended way to create threads on Windows for C runtime compatibility.
     *t = (HANDLE)_beginthreadex(NULL, 0, func, arg, 0, NULL);
     return (*t == NULL) ? -1 : 0;
 }
 int thread_join(thread_handle_t t) {
     if(t) {
+        // Wait for the thread to finish and then close the handle.
         WaitForSingleObject(t, INFINITE);
         CloseHandle(t);
     }
     return 0;
 }
 int thread_detach(thread_handle_t t) {
+    // On Windows, "detaching" is achieved by simply closing the handle.
+    // The thread will continue to run, and its resources will be freed by the OS on termination.
     if(t) CloseHandle(t); 
     return 0;
 }
 #else
-// Código específico para Linux e outros sistemas POSIX (não modificado)
+// POSIX-specific implementation using pthreads
 int thread_create(thread_handle_t *t, thread_func_t func, void *arg) {
     return pthread_create(t, NULL, func, arg);
 }

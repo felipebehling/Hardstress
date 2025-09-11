@@ -45,11 +45,11 @@ The GUI is constructed using the GTK3 toolkit. All data visualizations are custo
 
 #### Linux (Debian/Ubuntu)
 
-A C compiler (`build-essential`) and the GTK3 development libraries are required.
+A C compiler (`build-essential`), the GTK3 development libraries, and the Haru PDF library (`libhpdf-dev`) are required.
 
 ```bash
 sudo apt update
-sudo apt install build-essential libgtk-3-dev
+sudo apt install build-essential libgtk-3-dev libhpdf-dev
 ```
 
 For temperature monitoring, `lm-sensors` is recommended:
