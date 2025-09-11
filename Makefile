@@ -42,7 +42,24 @@ CFLAGS_RELEASE = -O3 -march=native -DNDEBUG
 # Define o CFLAGS padrão como debug
 CFLAGS ?= $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 
-.PHONY: all clean release watch
+# Definições para os testes
+TEST_TARGET = test_runner
+TEST_SRC_DIR = test
+TEST_SRCS = $(wildcard $(TEST_SRC_DIR)/*.c)
+# Fontes da aplicação necessários para os testes (excluindo main, ui, core)
+APP_TEST_SRCS = $(SRC_DIR)/metrics.c $(SRC_DIR)/utils.c
+TEST_OBJS = $(TEST_SRCS:.c=.o) $(APP_TEST_SRCS:.c=.o)
+
+# Flags de compilação para testes (agora com GTK para resolver dependências de header)
+ifeq ($(OS),Windows_NT)
+    TEST_CFLAGS = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR) -D_WIN32_DCOM
+    TEST_LDFLAGS = $(GTK_LIBS) -lpthread -lm
+else
+    TEST_CFLAGS = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
+    TEST_LDFLAGS = $(GTK_LIBS) -lpthread -lm
+endif
+
+.PHONY: all clean release watch test
 
 all: $(TARGET)$(TARGET_EXT)
 
@@ -52,8 +69,19 @@ $(TARGET)$(TARGET_EXT): $(OBJS)
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# Alvo para construir e rodar os testes
+test: $(TEST_TARGET)$(TARGET_EXT)
+	@./$(TEST_TARGET)$(TARGET_EXT)
+
+$(TEST_TARGET)$(TARGET_EXT): $(TEST_OBJS)
+	$(CC) -o $@ $^ $(TEST_LDFLAGS)
+
+$(TEST_SRC_DIR)/%.o: $(TEST_SRC_DIR)/%.c
+	$(CC) $(TEST_CFLAGS) -c -o $@ $<
+
 clean:
 	$(RM) $(TARGET)$(TARGET_EXT) $(SRC_DIR)/*.o
+	$(RM) $(TEST_TARGET)$(TARGET_EXT) $(TEST_SRC_DIR)/*.o
 
 release:
 	$(MAKE) all CFLAGS="$(CFLAGS_COMMON) $(CFLAGS_RELEASE)"

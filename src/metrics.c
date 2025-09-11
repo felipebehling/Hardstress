@@ -107,7 +107,8 @@ static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
     unsigned long long idled = idle_b - idle_a;
     if (totald == 0) return 0.0;
     double perc = (double)(totald - idled) / (double)totald;
-    if (perc < 0.0) perc = 0.0; if (perc > 1.0) perc = 1.0;
+    if (perc < 0.0) perc = 0.0;
+    if (perc > 1.0) perc = 1.0;
     return perc;
 }
 
