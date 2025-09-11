@@ -6,7 +6,6 @@
 #include <math.h>
 #include <time.h>
 #include <hpdf.h>
-#include <xlsxwriter.h>
 
 /* --- Definições de Cores do Tema Escuro --- */
 typedef struct {
@@ -42,7 +41,6 @@ static gboolean ui_tick(gpointer ud);
 static void set_controls_sensitive(AppContext *app, gboolean state);
 static void export_metrics_dialog(AppContext *app);
 static void export_to_pdf_metrics(const char *filename, AppContext *app);
-static void export_to_xlsx_metrics(const char *filename, AppContext *app);
 static void export_to_csv_metrics(const char *filename, AppContext *app);
 static void export_to_txt_metrics(const char *filename, AppContext *app);
 static gboolean gui_update_started(gpointer ud);
@@ -541,20 +539,15 @@ static void export_metrics_dialog(AppContext *app){
     gtk_file_filter_add_pattern(filter_pdf, "*.pdf");
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_pdf);
 
-    GtkFileFilter *filter_xlsx = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter_xlsx, "Excel Spreadsheet (*.xlsx)");
-    gtk_file_filter_add_pattern(filter_xlsx, "*.xlsx");
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_xlsx);
-
     GtkFileFilter *filter_csv = gtk_file_filter_new();
     gtk_file_filter_set_name(filter_csv, "CSV File (*.csv)");
     gtk_file_filter_add_pattern(filter_csv, "*.csv");
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_csv);
 
-    GtkFileFilter *filter_docx = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter_docx, "Word Document (*.docx)");
-    gtk_file_filter_add_pattern(filter_docx, "*.docx");
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_docx);
+    GtkFileFilter *filter_txt = gtk_file_filter_new();
+    gtk_file_filter_set_name(filter_txt, "Text File (*.txt)");
+    gtk_file_filter_add_pattern(filter_txt, "*.txt");
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_txt);
 
     char default_name[64];
     snprintf(default_name, sizeof(default_name), "HardStress_Metrics_%.0f.pdf", (double)time(NULL));
@@ -565,11 +558,9 @@ static void export_metrics_dialog(AppContext *app){
 
         if (g_str_has_suffix(filename, ".pdf")) {
             export_to_pdf_metrics(filename, app);
-        } else if (g_str_has_suffix(filename, ".xlsx")) {
-            export_to_xlsx_metrics(filename, app);
         } else if (g_str_has_suffix(filename, ".csv")) {
             export_to_csv_metrics(filename, app);
-        } else if (g_str_has_suffix(filename, ".docx")) {
+        } else if (g_str_has_suffix(filename, ".txt")) {
             export_to_txt_metrics(filename, app);
         }
 
@@ -631,32 +622,6 @@ static void export_to_txt_metrics(const char *filename, AppContext *app) {
     g_mutex_unlock(&app->history_mutex);
 
     fclose(f);
-}
-
-static void export_to_xlsx_metrics(const char *filename, AppContext *app) {
-    lxw_workbook  *workbook  = workbook_new(filename);
-    lxw_worksheet *worksheet = workbook_add_worksheet(workbook, NULL);
-
-    worksheet_write_string(worksheet, 0, 0, "timestamp_sec", NULL);
-    for (int t=0; t<app->threads; t++) {
-        char header[32];
-        snprintf(header, sizeof(header), "thread%d_iters_total", t);
-        worksheet_write_string(worksheet, 0, t + 1, header, NULL);
-    }
-
-    g_mutex_lock(&app->history_mutex);
-    if(app->thread_history) {
-        for (int s=0; s<app->history_len; s++){
-            int idx = (app->history_pos + 1 + s) % app->history_len;
-            worksheet_write_number(worksheet, s + 1, 0, (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0), NULL);
-            for (int t=0; t<app->threads; t++) {
-                worksheet_write_number(worksheet, s + 1, t + 1, app->thread_history[t][idx], NULL);
-            }
-        }
-    }
-    g_mutex_unlock(&app->history_mutex);
-
-    workbook_close(workbook);
 }
 
 static void export_to_pdf_metrics(const char *filename, AppContext *app) {
