@@ -64,4 +64,3 @@ release:
 watch:
 	@echo "--> Observando arquivos .c e .h para recompilação automática..."
 	find $(SRC_DIR) -name '*.c' -o -name '*.h' | entr -c -d -r make
-
