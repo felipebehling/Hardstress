@@ -1,7 +1,7 @@
 #include "metrics.h"
-#include "ui.h" // Para gui_log
+#include "ui.h" // For gui_log
 
-/* --- Protótipos Estáticos --- */
+/* --- Static Function Prototypes --- */
 #ifdef _WIN32
 static int pdh_init_query(AppContext *app);
 static void pdh_close_query(AppContext *app);
@@ -10,6 +10,7 @@ static void wmi_init(AppContext *app);
 static void wmi_deinit(AppContext *app);
 static void sample_temp_windows(AppContext *app);
 #else
+// Structure to hold CPU time values from /proc/stat
 typedef struct { unsigned long long user,nice,system,idle,iowait,irq,softirq,steal; } cpu_sample_t;
 static int read_proc_stat(cpu_sample_t *out, int maxcpu);
 static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b);
@@ -20,23 +21,26 @@ static void sample_temp_linux(AppContext *app);
 static void log_csv_header(AppContext *app);
 static void log_csv_sample(AppContext *app);
 
-/* --- Implementação da Thread Sampler --- */
+/* --- Sampler Thread Implementation --- */
 
 void cpu_sampler_thread_func(void *arg){
     AppContext *app = (AppContext*)arg;
     
 #ifdef _WIN32
+    // On Windows, initialize COM for WMI and the PDH query for CPU usage.
     wmi_init(app);
     if(pdh_init_query(app) != ERROR_SUCCESS) {
-        gui_log(app, "[ERRO] Falha ao inicializar PDH para monitoramento de CPU.\n");
+        gui_log(app, "[ERROR] Failed to initialize PDH for CPU monitoring.\n");
     }
 #endif
 
+    // If real-time CSV logging is enabled, write the header row.
     if(app->csv_realtime_en) {
         log_csv_header(app);
     }
 
     while (atomic_load(&app->running)){
+        // Select the correct sampling functions based on the OS
 #ifndef _WIN32
         sample_cpu_linux(app);
         sample_temp_linux(app);
@@ -44,35 +48,40 @@ void cpu_sampler_thread_func(void *arg){
         sample_cpu_windows(app);
         sample_temp_windows(app);
 #endif
-        // Pede para a thread da UI redesenhar os widgets
+        // Request the UI thread to redraw the graph widgets
         g_idle_add((GSourceFunc)gtk_widget_queue_draw, app->cpu_drawing);
         g_idle_add((GSourceFunc)gtk_widget_queue_draw, app->iters_drawing);
         
+        // If enabled, write the current sample to the CSV log.
         if (app->csv_realtime_en) {
             log_csv_sample(app);
         }
 
+        // Advance the circular buffer for the performance history graph
         g_mutex_lock(&app->history_mutex);
         app->history_pos = (app->history_pos + 1) % app->history_len;
         if (app->thread_history){
             for (int t=0; t<app->threads; t++){
-                // Zera a posição atual para o próximo ciclo de amostragem
+                // Zero out the current position for the next sampling cycle.
+                // The value will be filled in by the worker thread.
                 app->thread_history[t][app->history_pos] = 0;
             }
         }
         g_mutex_unlock(&app->history_mutex);
 
+        // Wait for the defined sample interval
         struct timespec r = {0, CPU_SAMPLE_INTERVAL_MS * 1000000};
         nanosleep(&r,NULL);
     }
 
 #ifdef _WIN32
+    // Clean up Windows-specific handles
     pdh_close_query(app);
     wmi_deinit(app);
 #endif
 }
 
-/* --- Implementações de Coleta de Dados --- */
+/* --- Data Collection Implementations --- */
 
 int detect_cpu_count(void){
 #ifdef _WIN32
@@ -82,13 +91,20 @@ int detect_cpu_count(void){
 #endif
 }
 
-#ifndef _WIN32 /* LINUX IMPLEMENTATION */
+#ifndef _WIN32 /* --- LINUX IMPLEMENTATION --- */
+
+/**
+ * @brief Reads CPU time statistics from /proc/stat.
+ * @param out An array of cpu_sample_t to store the parsed data.
+ * @param maxcpu The maximum number of CPUs to read data for.
+ * @return The number of CPUs read, or -1 on failure.
+ */
 static int read_proc_stat(cpu_sample_t *out, int maxcpu){
     FILE *f = fopen("/proc/stat","r"); if(!f) return -1;
     char line[512]; int idx=-1;
     while (fgets(line,sizeof(line),f)){
-        if (strncmp(line,"cpu",3)!=0) break;
-        if (strncmp(line,"cpu ",4)==0) continue;
+        if (strncmp(line,"cpu",3)!=0) break; // Stop if we're past the CPU lines
+        if (strncmp(line,"cpu ",4)==0) continue; // Skip the aggregate "cpu" line
         idx++; if (idx>=maxcpu) break;
         sscanf(line,"cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu",
                &out[idx].user,&out[idx].nice,&out[idx].system,&out[idx].idle,&out[idx].iowait,&out[idx].irq,&out[idx].softirq,&out[idx].steal);
@@ -96,11 +112,17 @@ static int read_proc_stat(cpu_sample_t *out, int maxcpu){
     fclose(f); return idx+1;
 }
 
+/**
+ * @brief Calculates CPU usage percentage between two samples.
+ * @param a The first (earlier) CPU time sample.
+ * @param b The second (later) CPU time sample.
+ * @return The CPU usage as a value between 0.0 and 1.0.
+ */
 static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
-    unsigned long long idle_a=a->idle + a->iowait;
-    unsigned long long idle_b=b->idle + b->iowait;
-    unsigned long long nonidle_a=a->user + a->nice + a->system + a->irq + a->softirq + a->steal;
-    unsigned long long nonidle_b=b->user + b->nice + b->system + b->irq + b->softirq + b->steal;
+    unsigned long long idle_a = a->idle + a->iowait;
+    unsigned long long idle_b = b->idle + b->iowait;
+    unsigned long long nonidle_a = a->user + a->nice + a->system + a->irq + a->softirq + a->steal;
+    unsigned long long nonidle_b = b->user + b->nice + b->system + b->irq + b->softirq + b->steal;
     unsigned long long total_a = idle_a + nonidle_a;
     unsigned long long total_b = idle_b + nonidle_b;
     unsigned long long totald = total_b - total_a;
@@ -112,13 +134,19 @@ static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
     return perc;
 }
 
+/**
+ * @brief Samples CPU usage on Linux.
+ *
+ * Takes two snapshots of /proc/stat with a short delay and computes the
+ * differential usage for each core.
+ */
 static void sample_cpu_linux(AppContext *app){
     int n = app->cpu_count;
     cpu_sample_t *s1 = calloc(n, sizeof(cpu_sample_t));
     cpu_sample_t *s2 = calloc(n, sizeof(cpu_sample_t));
     if (!s1 || !s2){ free(s1); free(s2); return; }
     if (read_proc_stat(s1, n) <= 0){ free(s1); free(s2); return; }
-    struct timespec r = {0, 200*1000000}; nanosleep(&r,NULL);
+    struct timespec r = {0, 200*1000000}; nanosleep(&r,NULL); // 200ms delay
     if (read_proc_stat(s2, n) <= 0){ free(s1); free(s2); return; }
     g_mutex_lock(&app->cpu_mutex);
     for (int i=0;i<n;i++) app->cpu_usage[i] = compute_usage(&s1[i], &s2[i]);
@@ -126,18 +154,25 @@ static void sample_cpu_linux(AppContext *app){
     free(s1); free(s2);
 }
 
+/**
+ * @brief Samples CPU temperature on Linux by running `sensors`.
+ *
+ * Parses the output of `sensors -u` to find the first available thermal
+ * sensor reading. Requires the `lm-sensors` package to be installed.
+ */
 static void sample_temp_linux(AppContext *app){
     FILE *p = popen("sensors -u 2>/dev/null", "r");
     if (!p){ g_mutex_lock(&app->temp_mutex); app->temp_celsius = TEMP_UNAVAILABLE; g_mutex_unlock(&app->temp_mutex); return; }
     char line[256];
     double found = TEMP_UNAVAILABLE;
     while (fgets(line, sizeof(line), p)){
+        // Look for the first line ending in "_input:", which typically indicates a temp sensor.
         char *k = strstr(line, "_input:");
         if (k){
             double v;
             if (sscanf(k+7, "%lf", &v) == 1){
                 found = v;
-                break;
+                break; // Use the first one found
             }
         }
     }
@@ -145,8 +180,14 @@ static void sample_temp_linux(AppContext *app){
     g_mutex_lock(&app->temp_mutex); app->temp_celsius = found; g_mutex_unlock(&app->temp_mutex);
 }
 
-#else /* WINDOWS IMPLEMENTATION */
+#else /* --- WINDOWS IMPLEMENTATION --- */
 
+/**
+ * @brief Initializes the PDH (Performance Data Helper) query for CPU usage.
+ *
+ * Sets up a PDH query and adds a counter for "% Processor Time" for each
+ * logical processor on the system.
+ */
 static int pdh_init_query(AppContext *app){
     if (PdhOpenQuery(NULL, 0, &app->pdh_query) != ERROR_SUCCESS) return -1;
     app->pdh_counters = calloc(app->cpu_count, sizeof(PDH_HCOUNTER));
@@ -158,15 +199,19 @@ static int pdh_init_query(AppContext *app){
         char path[256];
         snprintf(path, sizeof(path), "\\Processor(%d)\\%% Processor Time", i);
         if (PdhAddCounterA(app->pdh_query, path, 0, &app->pdh_counters[i]) != ERROR_SUCCESS) {
+            // Cleanup on failure
             for (int j = 0; j < i; j++) PdhRemoveCounter(app->pdh_counters[j]);
             free(app->pdh_counters); app->pdh_counters = NULL;
             PdhCloseQuery(app->pdh_query); app->pdh_query = NULL;
             return -1;
         }
     }
-    return PdhCollectQueryData(app->pdh_query);
+    return PdhCollectQueryData(app->pdh_query); // Initial collection
 }
 
+/**
+ * @brief Closes the PDH query and frees associated resources.
+ */
 static void pdh_close_query(AppContext *app) {
     if(!app->pdh_query) return;
     if (app->pdh_counters) {
@@ -178,6 +223,9 @@ static void pdh_close_query(AppContext *app) {
     app->pdh_query = NULL;
 }
 
+/**
+ * @brief Samples CPU usage on Windows using the PDH library.
+ */
 static void sample_cpu_windows(AppContext *app){
     if (!app->pdh_query) return;
     PdhCollectQueryData(app->pdh_query);
@@ -194,6 +242,9 @@ static void sample_cpu_windows(AppContext *app){
     g_mutex_unlock(&app->cpu_mutex);
 }
 
+/**
+ * @brief Initializes COM and connects to the WMI service for temperature monitoring.
+ */
 static void wmi_init(AppContext *app) {
     app->pSvc = NULL;
     app->pLoc = NULL;
@@ -216,11 +267,22 @@ static void wmi_init(AppContext *app) {
         CoUninitialize();
     }
 }
+
+/**
+ * @brief Deinitializes COM and releases WMI resources.
+ */
 static void wmi_deinit(AppContext *app) {
     if(app->pSvc) { app->pSvc->lpVtbl->Release(app->pSvc); app->pSvc = NULL; }
     if(app->pLoc) { app->pLoc->lpVtbl->Release(app->pLoc); app->pLoc = NULL; }
     CoUninitialize();
 }
+
+/**
+ * @brief Samples CPU temperature on Windows by querying WMI.
+ *
+ * Queries the `MSAcpi_ThermalZoneTemperature` class to get a temperature
+ * reading. The value is returned in tenths of a Kelvin and is converted to Celsius.
+ */
 static void sample_temp_windows(AppContext *app) {
     if (!app->pSvc) {
         g_mutex_lock(&app->temp_mutex); app->temp_celsius = TEMP_UNAVAILABLE; g_mutex_unlock(&app->temp_mutex);
@@ -235,6 +297,7 @@ static void sample_temp_windows(AppContext *app) {
         ULONG uReturn = 0;
         if (pEnumerator->lpVtbl->Next(pEnumerator, WBEM_INFINITE, 1, &pclsObj, &uReturn) == WBEM_S_NO_ERROR && uReturn != 0) {
             VARIANT vtProp;
+            // The temperature is in tenths of a Kelvin.
             pclsObj->lpVtbl->Get(pclsObj, L"CurrentTemperature", 0, &vtProp, 0, 0);
             temp = (V_I4(&vtProp) / 10.0) - 273.15;
             VariantClear(&vtProp);
@@ -249,6 +312,9 @@ static void sample_temp_windows(AppContext *app) {
 
 /* --- CSV LOGGING --- */
 
+/**
+ * @brief Writes the header row to the real-time CSV log file.
+ */
 static void log_csv_header(AppContext *app) {
     if (!app->csv_log_file) return;
     fprintf(app->csv_log_file, "timestamp");
@@ -258,26 +324,31 @@ static void log_csv_header(AppContext *app) {
     fflush(app->csv_log_file);
 }
 
+/**
+ * @brief Writes a single data sample row to the real-time CSV log file.
+ */
 static void log_csv_sample(AppContext *app) {
     if (!app->csv_log_file) return;
     
-    // Obter o timestamp atual (não está no .h, mas pertence a utils.c, o protótipo seria necessário)
+    // Get current timestamp
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     double timestamp = ts.tv_sec + ts.tv_nsec * 1e-9;
     fprintf(app->csv_log_file, "%.3f", timestamp);
 
+    // Log CPU usage for each core
     g_mutex_lock(&app->cpu_mutex);
     for (int c = 0; c < app->cpu_count; c++) fprintf(app->csv_log_file, ",%.6f", app->cpu_usage[c]);
     g_mutex_unlock(&app->cpu_mutex);
 
-    // O histórico em memória guarda o valor total de iterações, que é o que queremos logar
+    // The history buffer stores the total iteration count, which is what we want to log.
     g_mutex_lock(&app->history_mutex);
-    int current_pos = app->history_pos; // A posição que acabamos de preencher
+    int current_pos = app->history_pos; // The position that was just updated
     if(app->thread_history) {
       for (int t = 0; t < app->threads; t++) fprintf(app->csv_log_file, ",%u", app->thread_history[t][current_pos]);
     }
     g_mutex_unlock(&app->history_mutex);
     
+    // Log temperature
     g_mutex_lock(&app->temp_mutex);
     fprintf(app->csv_log_file, ",%.3f\n", app->temp_celsius);
     g_mutex_unlock(&app->temp_mutex);

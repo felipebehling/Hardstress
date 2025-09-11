@@ -3,7 +3,7 @@
 #include "utils.h"   // Para now_sec, shuffle32, etc.
 #include "ui.h"      // Para gui_log
 
-/* --- Protótipos Estáticos --- */
+/* --- Static Function Prototypes --- */
 static void worker_main(void *arg);
 static void kernel_fpu(float *A, float *B, float *C, size_t n, int iters);
 static inline uint64_t mix64(uint64_t x);
@@ -11,7 +11,7 @@ static void kernel_int(uint64_t *dst, size_t n, int iters);
 static void kernel_stream(uint8_t *buf, size_t n);
 static void kernel_ptrchase(uint32_t *idx, size_t n, int rounds);
 
-/* --- Implementação da Thread Controladora --- */
+/* --- Controller Thread Implementation --- */
 
 void controller_thread_func(void *arg){
     AppContext *app = (AppContext*)arg;
@@ -99,8 +99,16 @@ void controller_thread_func(void *arg){
     g_idle_add((GSourceFunc)gui_update_stopped, app);
 }
 
-/* --- Implementação da Thread Worker e Kernels --- */
+/* --- Worker Thread and Kernels Implementation --- */
 
+/**
+ * @brief Main function for each worker thread.
+ *
+ * This function is the entry point for the stress-testing threads. It allocates
+ * its memory buffer, initializes it with random data, and then enters a tight
+ * loop, calling the selected stress kernel functions until signaled to stop.
+ * @param arg A pointer to the worker's `worker_t` context.
+ */
 static void worker_main(void *arg){
     worker_t *w = (worker_t*)arg;
     AppContext *app = w->app;
@@ -109,13 +117,14 @@ static void worker_main(void *arg){
     if (w->buf_bytes > 0) {
         w->buf = malloc(w->buf_bytes);
         if (!w->buf){
-            gui_log(app, "[T%d] falha na alocacao do buffer (%zu bytes)\n", w->tid, w->buf_bytes);
+            gui_log(app, "[T%d] Buffer allocation failed (%zu bytes)\n", w->tid, w->buf_bytes);
             atomic_fetch_add(&app->errors, 1);
             atomic_store(&w->status, WORKER_ALLOC_FAIL);
             return;
         }
     }
 
+    // Set up pointers and random seed
     size_t floats = w->buf_bytes / sizeof(float);
     float *A = (float*)w->buf;
     float *B = (float*)(w->buf + w->buf_bytes/3);
@@ -123,6 +132,7 @@ static void worker_main(void *arg){
     uint64_t *I64 = (uint64_t*)w->buf;
     uint64_t seed = 0x12340000 + (uint64_t)w->tid;
 
+    // Initialize buffer for FPU kernel
     if (app->kernel_fpu_en && w->buf) {
         for (size_t i=0; i < (floats / 3); i++){
             A[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
@@ -130,16 +140,18 @@ static void worker_main(void *arg){
             C[i] = (float)(splitmix64(&seed) & 0xFFFF) / 65535.0f;
         }
     }
+    // Initialize buffer for Integer kernel
     if (app->kernel_int_en && w->buf) {
         size_t ints64 = w->buf_bytes / sizeof(uint64_t);
         for (size_t i=0;i<ints64;i++) I64[i] = splitmix64(&seed);
     }
     
+    // Initialize index array for Pointer Chasing kernel
     if(app->kernel_ptr_en && w->buf) {
         w->idx_len = (w->buf_bytes / sizeof(uint32_t));
         w->idx = malloc(w->idx_len * sizeof(uint32_t));
         if (!w->idx){
-            gui_log(app, "[T%d] falha na alocacao do indice\n", w->tid);
+            gui_log(app, "[T%d] Index allocation failed\n", w->tid);
             atomic_fetch_add(&app->errors, 1);
             atomic_store(&w->status, WORKER_ALLOC_FAIL);
             free(w->buf);
@@ -147,12 +159,12 @@ static void worker_main(void *arg){
         }
         for (uint32_t i=0; i<w->idx_len; i++) w->idx[i] = i;
         shuffle32(w->idx, w->idx_len, &seed);
-        // CORRIGIDO: Typo e linha restaurada
-        w->idx[w->idx_len-1] = 0;
+        w->idx[w->idx_len-1] = 0; // Ensure the chase is a cycle
     }
 
     atomic_store(&w->running, 1u);
 
+    // Main stress loop
     while (atomic_load(&w->running) && atomic_load(&app->running)){
         if (w->buf) {
             if(app->kernel_fpu_en) kernel_fpu(A,B,C, (floats / 3), 4);
@@ -164,26 +176,39 @@ static void worker_main(void *arg){
         atomic_fetch_add(&w->iters, 1u);
         atomic_fetch_add(&app->total_iters, 1u);
         
+        // Record iteration count for the history graph
         g_mutex_lock(&app->history_mutex);
         if (app->thread_history) app->thread_history[w->tid][app->history_pos] = atomic_load(&w->iters);
         g_mutex_unlock(&app->history_mutex);
     }
 
+    // Cleanup
     if(w->idx) free(w->idx);
     if(w->buf) free(w->buf);
 }
 
-// ADICIONADO: Definições das funções que estavam faltando
+/**
+ * @brief Performs a floating-point intensive computation (FMA).
+ * Stresses the Floating Point Unit (FPU).
+ */
 static void kernel_fpu(float *A, float *B, float *C, size_t n, int iters){
     for (int k = 0; k < iters; ++k)
         for (size_t i = 0; i < n; ++i) C[i] = A[i]*B[i] + C[i];
 }
 
+/**
+ * @brief A 64-bit mixing function to generate pseudo-random behavior.
+ * Used by the integer kernel.
+ */
 static inline uint64_t mix64(uint64_t x){
     x ^= x >> 33; x *= 0xff51afd7ed558ccdULL; x ^= x >> 33; x *= 0xc4ceb9fe1a85ec53ULL; x ^= x >> 33;
     return x;
 }
 
+/**
+ * @brief Performs a series of complex integer and bitwise operations.
+ * Stresses the Arithmetic Logic Units (ALUs).
+ */
 static void kernel_int(uint64_t *dst, size_t n, int iters){
     uint64_t acc = 0xC0FFEE;
     for (int k=0;k<iters;k++){
@@ -194,14 +219,22 @@ static void kernel_int(uint64_t *dst, size_t n, int iters){
     }
 }
 
+/**
+ * @brief Performs large memory copy operations.
+ * Stresses the memory bus and controllers.
+ */
 static void kernel_stream(uint8_t *buf, size_t n){
     memset(buf, 0xA5, n/2);
     memcpy(buf + n/2, buf, n/2);
 }
 
+/**
+ * @brief Traverses a shuffled array of pointers in a pseudo-random order.
+ * Stresses the CPU cache and memory prefetcher by creating a long dependency chain.
+ */
 static void kernel_ptrchase(uint32_t *idx, size_t n, int rounds){
     size_t i = 0;
     for (int r=0;r<rounds;r++)
         for (size_t s=0;s<n;s++) i = idx[i];
-    (void)i; // Evita warning de variável não usada
+    (void)i; // Avoid unused variable warning
 }
