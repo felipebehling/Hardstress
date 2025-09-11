@@ -28,11 +28,11 @@ ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -D_WIN32_DCOM -I$(SRC_DIR)
     # MODIFICADO: Adicionada a flag -mwindows para ocultar o console
-    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows
+    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows -lhpdf -lxlsxwriter
 else
     # Linux/Outros
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) -lpthread -lm
+    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lhpdf -lxlsxwriter
 endif
 
 # Flags específicas para cada tipo de build
