@@ -32,7 +32,6 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
 static void on_btn_start_clicked(GtkButton *b, gpointer ud);
 static void on_btn_stop_clicked(GtkButton *b, gpointer ud);
 static void on_btn_export_metrics_clicked(GtkButton *b, gpointer ud);
-static void on_btn_export_log_clicked(GtkButton *b, gpointer ud);
 static void on_btn_defaults_clicked(GtkButton *b, gpointer ud);
 static void on_btn_clear_log_clicked(GtkButton *b, gpointer ud);
 static void check_memory_warning(AppContext *app);
@@ -42,10 +41,10 @@ static void on_window_destroy(GtkWidget *w, gpointer ud);
 static gboolean ui_tick(gpointer ud);
 static void set_controls_sensitive(AppContext *app, gboolean state);
 static void export_metrics_dialog(AppContext *app);
-static void export_log_dialog(AppContext *app);
-static void export_to_pdf(const char *filename, const char *log_text);
-static void export_to_xlsx(const char *filename, const char *log_text);
-static void export_to_txt(const char *filename, const char *log_text);
+static void export_to_pdf_metrics(const char *filename, AppContext *app);
+static void export_to_xlsx_metrics(const char *filename, AppContext *app);
+static void export_to_csv_metrics(const char *filename, AppContext *app);
+static void export_to_txt_metrics(const char *filename, AppContext *app);
 static gboolean gui_update_started(gpointer ud);
 static void apply_css_theme(GtkWidget *window);
 static void draw_rounded_rect(cairo_t *cr, double x, double y, double w, double h, double r);
@@ -230,12 +229,6 @@ static void on_btn_export_metrics_clicked(GtkButton *b, gpointer ud){
     export_metrics_dialog(app);
 }
 
-static void on_btn_export_log_clicked(GtkButton *b, gpointer ud) {
-    (void)b;
-    AppContext *app = (AppContext*)ud;
-    export_log_dialog(app);
-}
-
 static void on_btn_defaults_clicked(GtkButton *b, gpointer ud) {
     (void)b;
     AppContext *app = (AppContext*)ud;
@@ -245,6 +238,18 @@ static void on_btn_defaults_clicked(GtkButton *b, gpointer ud) {
     gtk_entry_set_text(GTK_ENTRY(app->entry_mem), mem_buf);
 
     gtk_combo_box_set_active(GTK_COMBO_BOX(app->entry_threads), 0);
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_pin), TRUE);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_fpu), TRUE);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_int), TRUE);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_stream), TRUE);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_ptr), TRUE);
+
+    char dur_buf[32];
+    snprintf(dur_buf, sizeof(dur_buf), "%d", DEFAULT_DURATION_SEC);
+    gtk_entry_set_text(GTK_ENTRY(app->entry_dur), dur_buf);
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_csv_realtime), FALSE);
 
     gui_log(app, "[GUI] Configurações restauradas para os padrões.\n");
     check_memory_warning(app);
@@ -374,10 +379,7 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_grid_attach(GTK_GRID(config_grid), app->entry_mem, 1, row, 1, 1);
     g_signal_connect(app->entry_mem, "changed", G_CALLBACK(on_mem_entry_changed), app);
 
-    app->mem_warning_label = gtk_label_new(
-        "Warning: Allocating more than 20% of available RAM is not recommended unless you are an advanced user.\n"
-        "For standard operations, please keep the default value (256 MB)."
-    );
+    app->mem_warning_label = gtk_label_new("Warning: Allocating more than 20% of available RAM is not recommended unless you are an advanced user. For standard operations, please keep the default value (256 MB).");
     gtk_widget_set_halign(app->mem_warning_label, GTK_ALIGN_START);
     gtk_style_context_add_class(gtk_widget_get_style_context(app->mem_warning_label), "warning-label");
     gtk_grid_attach(GTK_GRID(config_grid), app->mem_warning_label, 0, ++row, 2, 1);
@@ -444,15 +446,11 @@ GtkWidget* create_main_window(AppContext *app) {
     gtk_box_pack_start(GTK_BOX(button_box), app->btn_stop, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(sidebar), button_box, FALSE, FALSE, 0);
 
-    app->btn_export = gtk_button_new_with_label("📊 Exportar Métricas (CSV)");
-    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_export), "styled-button");
-    gtk_box_pack_start(GTK_BOX(sidebar), app->btn_export, FALSE, FALSE, 0);
+    app->btn_save_metrics = gtk_button_new_with_label("Save Metrics");
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_save_metrics), "styled-button");
+    gtk_box_pack_start(GTK_BOX(sidebar), app->btn_save_metrics, FALSE, FALSE, 0);
 
-    app->btn_export_log = gtk_button_new_with_label("Exportar Log");
-    gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_export_log), "styled-button");
-    gtk_box_pack_start(GTK_BOX(sidebar), app->btn_export_log, FALSE, FALSE, 0);
-
-    app->btn_defaults = gtk_button_new_with_label("Restaurar Padrões");
+    app->btn_defaults = gtk_button_new_with_label("Restore Defaults");
     gtk_style_context_add_class(gtk_widget_get_style_context(app->btn_defaults), "styled-button");
     gtk_box_pack_start(GTK_BOX(sidebar), app->btn_defaults, FALSE, FALSE, 0);
 
@@ -506,8 +504,7 @@ GtkWidget* create_main_window(AppContext *app) {
     g_signal_connect(win, "delete-event", G_CALLBACK(on_window_delete), app);
     g_signal_connect(app->btn_start, "clicked", G_CALLBACK(on_btn_start_clicked), app);
     g_signal_connect(app->btn_stop, "clicked", G_CALLBACK(on_btn_stop_clicked), app);
-    g_signal_connect(app->btn_export, "clicked", G_CALLBACK(on_btn_export_metrics_clicked), app);
-    g_signal_connect(app->btn_export_log, "clicked", G_CALLBACK(on_btn_export_log_clicked), app);
+    g_signal_connect(app->btn_save_metrics, "clicked", G_CALLBACK(on_btn_export_metrics_clicked), app);
     g_signal_connect(app->btn_defaults, "clicked", G_CALLBACK(on_btn_defaults_clicked), app);
     g_signal_connect(app->btn_clear_log, "clicked", G_CALLBACK(on_btn_clear_log_clicked), app);
     g_signal_connect(app->cpu_drawing, "draw", G_CALLBACK(on_draw_cpu), app);
@@ -532,8 +529,8 @@ static void set_controls_sensitive(AppContext *app, gboolean state){
     gtk_widget_set_sensitive(app->btn_start, state);
 }
 
-static void export_log_dialog(AppContext *app) {
-    GtkWidget *dialog = gtk_file_chooser_dialog_new("Exportar Log",
+static void export_metrics_dialog(AppContext *app){
+    GtkWidget *dialog = gtk_file_chooser_dialog_new("Save Metrics",
         GTK_WINDOW(app->win),
         GTK_FILE_CHOOSER_ACTION_SAVE,
         "_Cancelar", GTK_RESPONSE_CANCEL,
@@ -549,11 +546,6 @@ static void export_log_dialog(AppContext *app) {
     gtk_file_filter_add_pattern(filter_xlsx, "*.xlsx");
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_xlsx);
 
-    GtkFileFilter *filter_txt = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter_txt, "Text File (*.txt)");
-    gtk_file_filter_add_pattern(filter_txt, "*.txt");
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_txt);
-
     GtkFileFilter *filter_csv = gtk_file_filter_new();
     gtk_file_filter_set_name(filter_csv, "CSV File (*.csv)");
     gtk_file_filter_add_pattern(filter_csv, "*.csv");
@@ -565,92 +557,109 @@ static void export_log_dialog(AppContext *app) {
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_docx);
 
     char default_name[64];
-    snprintf(default_name, sizeof(default_name), "HardStress_Log_%.0f.pdf", (double)time(NULL));
+    snprintf(default_name, sizeof(default_name), "HardStress_Metrics_%.0f.pdf", (double)time(NULL));
     gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), default_name);
 
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT){
         char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
 
-        GtkTextIter start, end;
-        gtk_text_buffer_get_start_iter(app->log_buffer, &start);
-        gtk_text_buffer_get_end_iter(app->log_buffer, &end);
-        char *log_text = gtk_text_buffer_get_text(app->log_buffer, &start, &end, FALSE);
-
         if (g_str_has_suffix(filename, ".pdf")) {
-            export_to_pdf(filename, log_text);
+            export_to_pdf_metrics(filename, app);
         } else if (g_str_has_suffix(filename, ".xlsx")) {
-            export_to_xlsx(filename, log_text);
+            export_to_xlsx_metrics(filename, app);
         } else if (g_str_has_suffix(filename, ".csv")) {
-            export_to_txt(filename, log_text);
+            export_to_csv_metrics(filename, app);
         } else if (g_str_has_suffix(filename, ".docx")) {
-            // DOCX is a complex format. We export as a plain text file,
-            // which can be opened in Word.
-            export_to_txt(filename, log_text);
-        } else {
-            export_to_txt(filename, log_text);
+            export_to_txt_metrics(filename, app);
         }
 
-        gui_log(app, "[GUI] Log exportado para %s\n", filename);
-        g_free(log_text);
+        gui_log(app, "[GUI] Metrics exported to %s\n", filename);
         g_free(filename);
     }
     gtk_widget_destroy(dialog);
 }
 
-static void export_metrics_dialog(AppContext *app){
-    GtkWidget *dialog = gtk_file_chooser_dialog_new("Exportar Histórico para CSV",
-        GTK_WINDOW(app->win),
-        GTK_FILE_CHOOSER_ACTION_SAVE, 
-        "_Cancelar", GTK_RESPONSE_CANCEL,
-        "_Salvar", GTK_RESPONSE_ACCEPT, NULL);
+static void export_to_csv_metrics(const char *filename, AppContext *app) {
+    FILE *f = fopen(filename, "w");
+    if (!f){
+        gui_log(app, "[GUI] ERRO: Falha ao abrir %s para escrita\n", filename);
+        return;
+    }
 
-    char default_name[64];
-    snprintf(default_name, sizeof(default_name), "HardStress_Export_%.0f.csv", (double)time(NULL));
-    gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), default_name);
+    fprintf(f, "timestamp_sec");
+    for (int t=0; t<app->threads; t++) fprintf(f, ",thread%d_iters_total", t);
+    fprintf(f, "\n");
 
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT){
-        char *fname = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-        FILE *f = fopen(fname, "w");
-        if (!f){
-            gui_log(app, "[GUI] ERRO: Falha ao abrir %s para escrita\n", fname);
-            g_free(fname);
-            gtk_widget_destroy(dialog);
-            return;
+    g_mutex_lock(&app->history_mutex);
+    if(app->thread_history) {
+        for (int s=0; s<app->history_len; s++){
+            int idx = (app->history_pos + 1 + s) % app->history_len;
+            fprintf(f, "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
+            for (int t=0; t<app->threads; t++) {
+                fprintf(f, ",%u", app->thread_history[t][idx]);
+            }
+            fprintf(f, "\n");
         }
+    }
+    g_mutex_unlock(&app->history_mutex);
 
-        fprintf(f, "timestamp_sec");
-        for (int t=0; t<app->threads; t++) fprintf(f, ",thread%d_iters_total", t);
-        fprintf(f, "\n");
+    fclose(f);
+}
 
-        g_mutex_lock(&app->history_mutex);
-        if(app->thread_history) {
-            for (int s=0; s<app->history_len; s++){
-                int idx = (app->history_pos + 1 + s) % app->history_len;
-                fprintf(f, "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
-                for (int t=0; t<app->threads; t++) {
-                    fprintf(f, ",%u", app->thread_history[t][idx]);
-                }
-                fprintf(f, "\n");
+static void export_to_txt_metrics(const char *filename, AppContext *app) {
+    FILE *f = fopen(filename, "w");
+    if (!f){
+        gui_log(app, "[GUI] ERRO: Falha ao abrir %s para escrita\n", filename);
+        return;
+    }
+
+    fprintf(f, "timestamp_sec");
+    for (int t=0; t<app->threads; t++) fprintf(f, "\tthread%d_iters_total", t);
+    fprintf(f, "\n");
+
+    g_mutex_lock(&app->history_mutex);
+    if(app->thread_history) {
+        for (int s=0; s<app->history_len; s++){
+            int idx = (app->history_pos + 1 + s) % app->history_len;
+            fprintf(f, "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
+            for (int t=0; t<app->threads; t++) {
+                fprintf(f, "\t%u", app->thread_history[t][idx]);
+            }
+            fprintf(f, "\n");
+        }
+    }
+    g_mutex_unlock(&app->history_mutex);
+
+    fclose(f);
+}
+
+static void export_to_xlsx_metrics(const char *filename, AppContext *app) {
+    lxw_workbook  *workbook  = workbook_new(filename);
+    lxw_worksheet *worksheet = workbook_add_worksheet(workbook, NULL);
+
+    worksheet_write_string(worksheet, 0, 0, "timestamp_sec", NULL);
+    for (int t=0; t<app->threads; t++) {
+        char header[32];
+        snprintf(header, sizeof(header), "thread%d_iters_total", t);
+        worksheet_write_string(worksheet, 0, t + 1, header, NULL);
+    }
+
+    g_mutex_lock(&app->history_mutex);
+    if(app->thread_history) {
+        for (int s=0; s<app->history_len; s++){
+            int idx = (app->history_pos + 1 + s) % app->history_len;
+            worksheet_write_number(worksheet, s + 1, 0, (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0), NULL);
+            for (int t=0; t<app->threads; t++) {
+                worksheet_write_number(worksheet, s + 1, t + 1, app->thread_history[t][idx], NULL);
             }
         }
-        g_mutex_unlock(&app->history_mutex);
-
-        fclose(f);
-        gui_log(app, "[GUI] CSV (snapshot da memória) exportado para %s\n", fname);
-        g_free(fname);
     }
-    gtk_widget_destroy(dialog);
+    g_mutex_unlock(&app->history_mutex);
+
+    workbook_close(workbook);
 }
 
-static void export_to_txt(const char *filename, const char *log_text) {
-    FILE *f = fopen(filename, "w");
-    if (f) {
-        fprintf(f, "%s", log_text);
-        fclose(f);
-    }
-}
-
-static void export_to_pdf(const char *filename, const char *log_text) {
+static void export_to_pdf_metrics(const char *filename, AppContext *app) {
     HPDF_Doc pdf = HPDF_New(NULL, NULL);
     if (!pdf) {
         return;
@@ -662,57 +671,49 @@ static void export_to_pdf(const char *filename, const char *log_text) {
     HPDF_Page_MoveTextPos(page, 50, 750);
     HPDF_Page_SetTextLeading(page, 12);
 
-    float page_width = HPDF_Page_GetWidth(page);
-    float max_width = page_width - 100; // 50 margin on each side
+    float y = 750;
+    HPDF_Page_MoveTextPos(page, 50, y);
 
-    char *dup = g_strdup(log_text);
-    char *line = strtok(dup, "\n");
-    while(line != NULL) {
-        const char *start = line;
-        while (strlen(start) > 0) {
-            size_t len = strlen(start);
-            size_t break_pos = 0;
-
-            for (size_t i = 1; i <= len; i++) {
-                char *sub = g_strndup(start, i);
-                if (HPDF_Page_TextWidth(page, sub) <= max_width) {
-                    break_pos = i;
-                }
-                g_free(sub);
-            }
-
-            char *sub_line = g_strndup(start, break_pos);
-            HPDF_Page_ShowTextNextLine(page, sub_line);
-            g_free(sub_line);
-
-            start += break_pos;
-        }
-        line = strtok(NULL, "\n");
+    HPDF_Page_ShowText(page, "timestamp_sec");
+    for (int t=0; t<app->threads; t++) {
+        char header[32];
+        snprintf(header, sizeof(header), "thread%d_iters_total", t);
+        HPDF_Page_MoveTextPos(page, 150 + t * 100, y);
+        HPDF_Page_ShowText(page, header);
     }
-    g_free(dup);
+    y -= 20;
+
+    g_mutex_lock(&app->history_mutex);
+    if(app->thread_history) {
+        for (int s=0; s<app->history_len; s++){
+            int idx = (app->history_pos + 1 + s) % app->history_len;
+            char val[32];
+
+            HPDF_Page_MoveTextPos(page, 50, y);
+            snprintf(val, sizeof(val), "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
+            HPDF_Page_ShowText(page, val);
+
+            for (int t=0; t<app->threads; t++) {
+                HPDF_Page_MoveTextPos(page, 150 + t * 100, y);
+                snprintf(val, sizeof(val), "%u", app->thread_history[t][idx]);
+                HPDF_Page_ShowText(page, val);
+            }
+            y -= 12;
+            if (y < 50) {
+                HPDF_Page_EndText(page);
+                page = HPDF_AddPage(pdf);
+                HPDF_Page_SetFontAndSize(page, font, 10);
+                HPDF_Page_BeginText(page);
+                y = 750;
+            }
+        }
+    }
+    g_mutex_unlock(&app->history_mutex);
 
     HPDF_Page_EndText(page);
     HPDF_SaveToFile(pdf, filename);
     HPDF_Free(pdf);
 }
-
-static void export_to_xlsx(const char *filename, const char *log_text) {
-    lxw_workbook  *workbook  = workbook_new(filename);
-    lxw_worksheet *worksheet = workbook_add_worksheet(workbook, NULL);
-
-    char *dup = g_strdup(log_text);
-    char *line = strtok(dup, "\n");
-    int row = 0;
-    while(line != NULL) {
-        worksheet_write_string(worksheet, row, 0, line, NULL);
-        line = strtok(NULL, "\n");
-        row++;
-    }
-    g_free(dup);
-
-    workbook_close(workbook);
-}
-
 
 static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
     AppContext *app = (AppContext*)user_data;

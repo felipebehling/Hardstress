@@ -117,7 +117,7 @@ struct AppContext {
     GtkWidget *check_pin;
     GtkWidget *check_fpu, *check_int, *check_stream, *check_ptr;
     GtkWidget *check_csv_realtime;
-    GtkWidget *btn_start, *btn_stop, *btn_export, *btn_export_log, *btn_defaults, *btn_clear_log;
+    GtkWidget *btn_start, *btn_stop, *btn_save_metrics, *btn_defaults, *btn_clear_log;
     GtkTextBuffer *log_buffer;
     GtkWidget *log_view;
     GtkWidget *cpu_drawing;
