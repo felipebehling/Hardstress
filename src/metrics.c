@@ -10,9 +10,6 @@ static void wmi_init(AppContext *app);
 static void wmi_deinit(AppContext *app);
 static void sample_temp_windows(AppContext *app);
 #else
-typedef struct { unsigned long long user,nice,system,idle,iowait,irq,softirq,steal; } cpu_sample_t;
-static int read_proc_stat(cpu_sample_t *out, int maxcpu);
-static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b);
 static void sample_cpu_linux(AppContext *app);
 static void sample_temp_linux(AppContext *app);
 #endif
@@ -83,20 +80,25 @@ int detect_cpu_count(void){
 }
 
 #ifndef _WIN32 /* LINUX IMPLEMENTATION */
-static int read_proc_stat(cpu_sample_t *out, int maxcpu){
-    FILE *f = fopen("/proc/stat","r"); if(!f) return -1;
-    char line[512]; int idx=-1;
-    while (fgets(line,sizeof(line),f)){
-        if (strncmp(line,"cpu",3)!=0) break;
-        if (strncmp(line,"cpu ",4)==0) continue;
-        idx++; if (idx>=maxcpu) break;
-        sscanf(line,"cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu",
-               &out[idx].user,&out[idx].nice,&out[idx].system,&out[idx].idle,&out[idx].iowait,&out[idx].irq,&out[idx].softirq,&out[idx].steal);
+int read_proc_stat(cpu_sample_t *out, int maxcpu, const char *path) {
+    FILE *f = fopen(path, "r"); if(!f) return -1;
+    char line[512];
+    int count = 0;
+    while (count < maxcpu && fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "cpu", 3) != 0) break;
+        if (strncmp(line, "cpu ", 4) == 0) continue;
+
+        sscanf(line, "cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu",
+               &out[count].user, &out[count].nice, &out[count].system,
+               &out[count].idle, &out[count].iowait, &out[count].irq,
+               &out[count].softirq, &out[count].steal);
+        count++;
     }
-    fclose(f); return idx+1;
+    fclose(f);
+    return count;
 }
 
-static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
+double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
     unsigned long long idle_a=a->idle + a->iowait;
     unsigned long long idle_b=b->idle + b->iowait;
     unsigned long long nonidle_a=a->user + a->nice + a->system + a->irq + a->softirq + a->steal;
@@ -112,18 +114,35 @@ static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
     return perc;
 }
 
-static void sample_cpu_linux(AppContext *app){
+static void sample_cpu_linux(AppContext *app) {
     int n = app->cpu_count;
-    cpu_sample_t *s1 = calloc(n, sizeof(cpu_sample_t));
-    cpu_sample_t *s2 = calloc(n, sizeof(cpu_sample_t));
-    if (!s1 || !s2){ free(s1); free(s2); return; }
-    if (read_proc_stat(s1, n) <= 0){ free(s1); free(s2); return; }
-    struct timespec r = {0, 200*1000000}; nanosleep(&r,NULL);
-    if (read_proc_stat(s2, n) <= 0){ free(s1); free(s2); return; }
+    if (n <= 0 || !app->prev_cpu_samples) return;
+
+    cpu_sample_t *current_samples = calloc(n, sizeof(cpu_sample_t));
+    if (!current_samples) return;
+
+    if (read_proc_stat(current_samples, n, "/proc/stat") <= 0) {
+        free(current_samples);
+        return;
+    }
+
+    // A primeira amostra apenas preenche o buffer 'prev'. O uso será calculado na próxima.
+    // Verificamos o primeiro valor 'user' para ver se o buffer já foi preenchido.
+    if (app->prev_cpu_samples[0].user == 0 && app->prev_cpu_samples[0].idle == 0) {
+        memcpy(app->prev_cpu_samples, current_samples, n * sizeof(cpu_sample_t));
+        free(current_samples);
+        return;
+    }
+
     g_mutex_lock(&app->cpu_mutex);
-    for (int i=0;i<n;i++) app->cpu_usage[i] = compute_usage(&s1[i], &s2[i]);
+    for (int i = 0; i < n; i++) {
+        app->cpu_usage[i] = compute_usage(&app->prev_cpu_samples[i], &current_samples[i]);
+    }
     g_mutex_unlock(&app->cpu_mutex);
-    free(s1); free(s2);
+
+    // Salva as amostras atuais para a próxima iteração
+    memcpy(app->prev_cpu_samples, current_samples, n * sizeof(cpu_sample_t));
+    free(current_samples);
 }
 
 static void sample_temp_linux(AppContext *app){
