@@ -10,10 +10,12 @@ static void wmi_init(AppContext *app);
 static void wmi_deinit(AppContext *app);
 static void sample_temp_windows(AppContext *app);
 #else
-// Structure to hold CPU time values from /proc/stat
-typedef struct { unsigned long long user,nice,system,idle,iowait,irq,softirq,steal; } cpu_sample_t;
-static int read_proc_stat(cpu_sample_t *out, int maxcpu);
-static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b);
+
+#else
+static void sample_cpu_linux(AppContext *app);
+static void sample_temp_linux(AppContext *app);
+#endif
+
 static void sample_cpu_linux(AppContext *app);
 static void sample_temp_linux(AppContext *app);
 #endif
@@ -91,26 +93,32 @@ int detect_cpu_count(void){
 #endif
 }
 
-#ifndef _WIN32 /* --- LINUX IMPLEMENTATION --- */
-
 /**
  * @brief Reads CPU time statistics from /proc/stat.
  * @param out An array of cpu_sample_t to store the parsed data.
  * @param maxcpu The maximum number of CPUs to read data for.
  * @return The number of CPUs read, or -1 on failure.
  */
-static int read_proc_stat(cpu_sample_t *out, int maxcpu){
-    FILE *f = fopen("/proc/stat","r"); if(!f) return -1;
-    char line[512]; int idx=-1;
-    while (fgets(line,sizeof(line),f)){
-        if (strncmp(line,"cpu",3)!=0) break; // Stop if we're past the CPU lines
-        if (strncmp(line,"cpu ",4)==0) continue; // Skip the aggregate "cpu" line
-        idx++; if (idx>=maxcpu) break;
-        sscanf(line,"cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu",
-               &out[idx].user,&out[idx].nice,&out[idx].system,&out[idx].idle,&out[idx].iowait,&out[idx].irq,&out[idx].softirq,&out[idx].steal);
+#ifndef _WIN32 /* LINUX IMPLEMENTATION */
+int read_proc_stat(cpu_sample_t *out, int maxcpu, const char *path) {
+    FILE *f = fopen(path, "r"); if(!f) return -1;
+    char line[512];
+    int count = 0;
+    while (count < maxcpu && fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "cpu", 3) != 0) break;
+        if (strncmp(line, "cpu ", 4) == 0) continue;
+
+        sscanf(line, "cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu",
+               &out[count].user, &out[count].nice, &out[count].system,
+               &out[count].idle, &out[count].iowait, &out[count].irq,
+               &out[count].softirq, &out[count].steal);
+        count++;
+
     }
-    fclose(f); return idx+1;
+    fclose(f);
+    return count;
 }
+
 
 /**
  * @brief Calculates CPU usage percentage between two samples.
@@ -118,11 +126,12 @@ static int read_proc_stat(cpu_sample_t *out, int maxcpu){
  * @param b The second (later) CPU time sample.
  * @return The CPU usage as a value between 0.0 and 1.0.
  */
-static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
-    unsigned long long idle_a = a->idle + a->iowait;
-    unsigned long long idle_b = b->idle + b->iowait;
-    unsigned long long nonidle_a = a->user + a->nice + a->system + a->irq + a->softirq + a->steal;
-    unsigned long long nonidle_b = b->user + b->nice + b->system + b->irq + b->softirq + b->steal;
+double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
+    unsigned long long idle_a=a->idle + a->iowait;
+    unsigned long long idle_b=b->idle + b->iowait;
+    unsigned long long nonidle_a=a->user + a->nice + a->system + a->irq + a->softirq + a->steal;
+    unsigned long long nonidle_b=b->user + b->nice + b->system + b->irq + b->softirq + b->steal;
+
     unsigned long long total_a = idle_a + nonidle_a;
     unsigned long long total_b = idle_b + nonidle_b;
     unsigned long long totald = total_b - total_a;
@@ -140,18 +149,33 @@ static double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
  * Takes two snapshots of /proc/stat with a short delay and computes the
  * differential usage for each core.
  */
-static void sample_cpu_linux(AppContext *app){
+
+static void sample_cpu_linux(AppContext *app) {
     int n = app->cpu_count;
-    cpu_sample_t *s1 = calloc(n, sizeof(cpu_sample_t));
-    cpu_sample_t *s2 = calloc(n, sizeof(cpu_sample_t));
-    if (!s1 || !s2){ free(s1); free(s2); return; }
-    if (read_proc_stat(s1, n) <= 0){ free(s1); free(s2); return; }
-    struct timespec r = {0, 200*1000000}; nanosleep(&r,NULL); // 200ms delay
-    if (read_proc_stat(s2, n) <= 0){ free(s1); free(s2); return; }
+    if (n <= 0 || !app->prev_cpu_samples) return;
+
+    cpu_sample_t *current_samples = calloc(n, sizeof(cpu_sample_t));
+    if (!current_samples) return;
+
+    if (read_proc_stat(current_samples, n, "/proc/stat") <= 0) {
+        free(current_samples);
+        return;
+    }
+
+    if (app->prev_cpu_samples[0].user == 0 && app->prev_cpu_samples[0].idle == 0) {
+        memcpy(app->prev_cpu_samples, current_samples, n * sizeof(cpu_sample_t));
+        free(current_samples);
+        return;
+    }
+
     g_mutex_lock(&app->cpu_mutex);
-    for (int i=0;i<n;i++) app->cpu_usage[i] = compute_usage(&s1[i], &s2[i]);
+    for (int i = 0; i < n; i++) {
+        app->cpu_usage[i] = compute_usage(&app->prev_cpu_samples[i], &current_samples[i]);
+    }
     g_mutex_unlock(&app->cpu_mutex);
-    free(s1); free(s2);
+
+    memcpy(app->prev_cpu_samples, current_samples, n * sizeof(cpu_sample_t));
+    free(current_samples);
 }
 
 /**

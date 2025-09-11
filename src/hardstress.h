@@ -18,6 +18,7 @@
 #else
 #include <pthread.h>
 #include <unistd.h>
+typedef struct { unsigned long long user,nice,system,idle,iowait,irq,softirq,steal; } cpu_sample_t;
 #endif
 
 #include <gtk/gtk.h>
@@ -126,11 +127,14 @@ struct AppContext {
     double *cpu_usage;              ///< Array to store the utilization of each CPU core (0.0 to 1.0).
     GMutex cpu_mutex;               ///< Mutex to protect access to the `cpu_usage` array.
 #ifdef _WIN32
+#ifdef _WIN32
     /* --- Windows-specific handles for performance monitoring --- */
     PDH_HQUERY pdh_query;           ///< A query handle for the Performance Data Helper (PDH) library.
     PDH_HCOUNTER *pdh_counters;     ///< An array of counter handles for individual CPU cores.
     IWbemServices *pSvc;            ///< A pointer to the WMI services for temperature querying.
     IWbemLocator *pLoc;             ///< A pointer to the WMI locator for connecting to WMI.
+#else
+    cpu_sample_t *prev_cpu_samples;
 #endif
 
     /* --- Per-Thread Performance History --- */
