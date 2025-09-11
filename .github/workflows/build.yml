@@ -29,6 +29,8 @@ jobs:
             mingw-w64-x86_64-gtk3
             pkg-config
             make
+            mingw-w64-x86_64-libhpdf
+            mingw-w64-x86_64-xlsxwriter
           msystem: MINGW64
 
       - name: Build (Linux)
