@@ -34,6 +34,9 @@ void controller_thread_func(void *arg){
 
     app->cpu_count = detect_cpu_count();
     app->cpu_usage = calloc(app->cpu_count, sizeof(double));
+#ifndef _WIN32
+    app->prev_cpu_samples = calloc(app->cpu_count, sizeof(cpu_sample_t));
+#endif
 
     app->history_len = HISTORY_SAMPLES;
     app->history_pos = 0;
@@ -90,6 +93,9 @@ void controller_thread_func(void *arg){
     free(app->workers); app->workers = NULL;
     free(app->worker_threads); app->worker_threads = NULL;
     free(app->cpu_usage); app->cpu_usage = NULL;
+#ifndef _WIN32
+    free(app->prev_cpu_samples); app->prev_cpu_samples = NULL;
+#endif
 
     // A thread se desvincula. Não há mais um handle para ela ser aguardada (joined).
     thread_detach(app->controller_thread); 

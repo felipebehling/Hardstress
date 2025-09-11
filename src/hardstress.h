@@ -18,6 +18,7 @@
 #else
 #include <pthread.h>
 #include <unistd.h>
+typedef struct { unsigned long long user,nice,system,idle,iowait,irq,softirq,steal; } cpu_sample_t;
 #endif
 
 #include <gtk/gtk.h>
@@ -99,6 +100,8 @@ struct AppContext {
     PDH_HCOUNTER *pdh_counters;
     IWbemServices *pSvc;
     IWbemLocator *pLoc;
+#else
+    cpu_sample_t *prev_cpu_samples;
 #endif
 
     /* per-thread history */
