@@ -55,11 +55,13 @@ ifeq ($(OS),Windows_NT)
     TEST_LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32
 else
     # Linux/Outros
+
     TEST_CFLAGS = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
     TEST_LDFLAGS = $(GTK_LIBS) -lpthread -lm
 endif
 
 # --- Alvos do Makefile ---
+
 .PHONY: all clean release watch test
 
 all: $(TARGET)$(TARGET_EXT)
@@ -88,6 +90,7 @@ $(SRC_DIR)/%.test.o: $(SRC_DIR)/%.c
 clean:
 	$(RM) $(TARGET)$(TARGET_EXT) $(SRC_DIR)/*.o
 	$(RM) $(TEST_TARGET)$(TARGET_EXT) $(TEST_SRC_DIR)/*.o $(SRC_DIR)/*.test.o
+
 
 release:
 	$(MAKE) all CFLAGS="$(CFLAGS_COMMON) $(CFLAGS_RELEASE)"
