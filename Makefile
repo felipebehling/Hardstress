@@ -32,7 +32,7 @@ ifeq ($(OS),Windows_NT)
 else
     # Linux/Outros
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lhpdf
+    LDFLAGS = $(GTK_LIBS) -L/usr/lib/x86_64-linux-gnu -lpthread -lm -lhpdf
 endif
 
 # Flags específicas para cada tipo de build
