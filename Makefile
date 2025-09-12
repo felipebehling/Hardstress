@@ -24,16 +24,18 @@ OBJS = $(SRCS:.c=.o)
 PKG_CONFIG ?= pkg-config
 GTK_CFLAGS := $(shell $(PKG_CONFIG) --cflags gtk+-3.0)
 GTK_LIBS   := $(shell $(PKG_CONFIG) --libs gtk+-3.0)
+HPDF_CFLAGS := $(shell $(PKG_CONFIG) --cflags libhpdf)
+HPDF_LIBS   := $(shell $(PKG_CONFIG) --libs libhpdf)
 
 # Flags de compilação e linkagem por plataforma
 ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
-    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -D_WIN32_DCOM -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows -lhpdf
+    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HPDF_CFLAGS) -D_WIN32_DCOM -I$(SRC_DIR)
+    LDFLAGS = $(GTK_LIBS) $(HPDF_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows
 else
     # Linux/Outros
-    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) -L/usr/lib/x86_64-linux-gnu -lpthread -lm -lhpdf
+    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HPDF_CFLAGS) -I$(SRC_DIR)
+    LDFLAGS = $(GTK_LIBS) $(HPDF_LIBS) -L/usr/lib/x86_64-linux-gnu -lpthread -lm
 endif
 
 CFLAGS_DEBUG = -O2 -g
