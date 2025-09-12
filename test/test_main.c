@@ -1,5 +1,17 @@
 #include <stdio.h>
 #include <assert.h>
+
+// Custom assert for test builds to avoid linker issues with __assert_fail on some platforms.
+#ifdef TESTING_BUILD
+#include <stdlib.h> // For exit()
+#undef assert
+#define assert(expr) \
+    if (!(expr)) { \
+        fprintf(stderr, "Custom Assertion failed: %s, file %s, line %d\n", #expr, __FILE__, __LINE__); \
+        exit(1); \
+    }
+#endif
+
 #include "hardstress.h"
 #include "metrics.h"
 #include "utils.h"

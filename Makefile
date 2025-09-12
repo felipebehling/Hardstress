@@ -51,7 +51,7 @@ TEST_OBJS = $(TEST_SRCS:.c=.o) $(APP_TEST_SRCS:.c=.test.o)
 
 # Flags de compilação para testes
 ifeq ($(OS),Windows_NT)
-    TEST_CFLAGS = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR) -D_WIN32_DCOM -DTESTING_BUILD
+    TEST_CFLAGS = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR) -D_WIN32 -D_WIN32_DCOM -DTESTING_BUILD
     TEST_LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32
 else
     # Linux/Outros

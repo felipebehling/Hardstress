@@ -1,6 +1,10 @@
 #include "metrics.h"
 #include "ui.h" // For gui_log
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 /* --- Static Function Prototypes --- */
 #ifdef _WIN32
 static int pdh_init_query(AppContext *app);
@@ -81,9 +85,12 @@ void cpu_sampler_thread_func(void *arg){
 
 int detect_cpu_count(void){
 #ifdef _WIN32
-    SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors;
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    return sysInfo.dwNumberOfProcessors > 0 ? (int)sysInfo.dwNumberOfProcessors : 1;
 #else
-    long n = sysconf(_SC_NPROCESSORS_ONLN); return n > 0 ? (int)n : 1;
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+    return n > 0 ? (int)n : 1;
 #endif
 }
 
