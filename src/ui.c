@@ -6,6 +6,7 @@
 #include <math.h>
 #include <time.h>
 #include <hpdf.h>
+#include <errno.h>
 
 /* --- Dark Theme Color Definitions --- */
 typedef struct {
@@ -159,9 +160,14 @@ void gui_log(AppContext *app, const char *fmt, ...){
     
     // Add timestamp to the log message
     time_t now = time(NULL);
-    struct tm *t = localtime(&now);
+    struct tm t;
+    #ifdef _WIN32
+        localtime_s(&t, &now);
+    #else
+        localtime_r(&now, &t);
+    #endif
     char timestamp[32];
-    strftime(timestamp, sizeof(timestamp), "[%H:%M:%S]", t);
+    strftime(timestamp, sizeof(timestamp), "[%H:%M:%S]", &t);
     
     GtkTextIter end;
     gtk_text_buffer_get_end_iter(app->log_buffer, &end);
@@ -219,18 +225,37 @@ static void on_btn_start_clicked(GtkButton *b, gpointer ud){
 
     char *end;
     char *threads_str = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(app->entry_threads));
+    if (!threads_str) {
+        gui_log(app, "[GUI] Could not read thread value.\n");
+        return;
+    }
     long threads;
     if (strcmp(threads_str, "Auto") == 0) {
         threads = 0;
     } else {
+        errno = 0;
         threads = strtol(threads_str, &end, 10);
-        if (*end != '\0' || threads < 0){ gui_log(app, "[GUI] Invalid threads value\n"); g_free(threads_str); return; }
+        if (*end != '\0' || threads < 0 || errno == ERANGE){
+            gui_log(app, "[GUI] Invalid threads value\n");
+            g_free(threads_str);
+            return;
+        }
     }
     g_free(threads_str);
+
+    errno = 0;
     long mem = strtol(gtk_entry_get_text(GTK_ENTRY(app->entry_mem)), &end, 10);
-    if (*end != '\0' || mem <= 0){ gui_log(app, "[GUI] Invalid memory value\n"); return; }
+    if (*end != '\0' || mem <= 0 || errno == ERANGE){
+        gui_log(app, "[GUI] Invalid memory value\n");
+        return;
+    }
+
+    errno = 0;
     long dur = strtol(gtk_entry_get_text(GTK_ENTRY(app->entry_dur)), &end, 10);
-    if (*end != '\0' || dur < 0){ gui_log(app, "[GUI] Invalid duration value\n"); return; }
+    if (*end != '\0' || dur < 0 || errno == ERANGE){
+        gui_log(app, "[GUI] Invalid duration value\n");
+        return;
+    }
 
     app->threads = (threads == 0) ? detect_cpu_count() : (int)threads;
     app->mem_mib_per_thread = (size_t)mem;
@@ -350,6 +375,17 @@ static void on_mem_entry_changed(GtkEditable *editable, gpointer user_data) {
     check_memory_warning((AppContext*)user_data);
 }
 
+static gboolean check_if_stopped_and_close(gpointer user_data) {
+    AppContext *app = (AppContext*)user_data;
+
+    if (app->controller_thread == 0 || !atomic_load(&app->running)) {
+        gtk_widget_destroy(app->win);
+        return G_SOURCE_REMOVE;
+    }
+
+    return G_SOURCE_CONTINUE;
+}
+
 /**
  * @brief Callback for the window "delete" (close button) event.
  *
@@ -357,12 +393,13 @@ static void on_mem_entry_changed(GtkEditable *editable, gpointer user_data) {
  * to close, preventing an abrupt termination.
  */
 static gboolean on_window_delete(GtkWidget *w, GdkEvent *e, gpointer ud){
-    (void)w; (void)e;
+    (void)e;
     AppContext *app = (AppContext*)ud;
     if (atomic_load(&app->running)){
         gui_log(app, "[GUI] Closing: requesting stop...\n");
         atomic_store(&app->running, 0);
-        struct timespec r = {1, 500000000}; nanosleep(&r,NULL);
+        g_timeout_add(100, check_if_stopped_and_close, app);
+        return TRUE;
     }
     return FALSE;
 }
@@ -396,6 +433,7 @@ static gboolean ui_tick(gpointer ud){
  */
 GtkWidget* create_main_window(AppContext *app) {
     GtkWidget *win = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    app->win = win;
     gtk_window_set_default_size(GTK_WINDOW(win), 1400, 900);
     gtk_window_set_title(GTK_WINDOW(win), "HardStress - Advanced System Stress Testing");
     
@@ -938,7 +976,10 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
         int samples = app->history_len;
         double step_x = (samples > 1) ? ((double)W / (samples - 1)) : W;
         int start_idx = (app->history_pos + 1) % samples;
-        unsigned last_v = app->thread_history ? app->thread_history[t][start_idx] : 0;
+        unsigned last_v = 0;
+        if (app->thread_history) {
+            last_v = app->thread_history[t][start_idx];
+        }
         
         cairo_move_to(cr, -10, H + 10); // Start off-screen
 
