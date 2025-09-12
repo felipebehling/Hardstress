@@ -44,7 +44,7 @@ CFLAGS ?= $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 # --- Build dos Testes ---
 TEST_TARGET = test_runner
 # Fontes da aplicação necessários para os testes
-APP_TEST_SRCS = $(SRC_DIR)/metrics.c $(SRC_DIR)/utils.c
+APP_TEST_SRCS = $(SRC_DIR)/utils.c
 # Fontes dos testes
 TEST_SRCS = $(wildcard $(TEST_SRC_DIR)/*.c)
 # Objs dos testes (com sufixo .test.o para evitar conflitos)
