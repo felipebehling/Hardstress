@@ -859,6 +859,11 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
     gtk_widget_get_allocation(widget, &alloc);
     int W = alloc.width, H = alloc.height;
     
+    // Divide the area: 70% for the graph, 30% for the legend table
+    int graph_W = W * 0.7;
+    int table_X = graph_W + 10;
+    int table_W = W - graph_W - 10;
+
     cairo_set_antialias(cr, CAIRO_ANTIALIAS_DEFAULT);
 
     // Background
@@ -866,8 +871,8 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
     draw_rounded_rect(cr, 0, 0, W, H, 8.0);
     cairo_fill(cr);
     
-    // Grid
-    draw_grid_background(cr, W, H, 30);
+    // Grid for the graph area
+    draw_grid_background(cr, graph_W, H, 30);
 
     const rgba_t thread_colors[] = {
         {0.2, 0.6, 1.0, 0.8}, {0.1, 0.9, 0.7, 0.8}, {1.0, 0.8, 0.2, 0.8}, {0.9, 0.3, 0.4, 0.8},
@@ -875,7 +880,27 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
     };
     const int num_colors = sizeof(thread_colors) / sizeof(rgba_t);
 
+    unsigned long long total_diff = 0;
+    unsigned* diffs = calloc(app->threads, sizeof(unsigned));
+
     g_mutex_lock(&app->history_mutex);
+
+    // First pass: calculate diffs and total_diff
+    int samples = app->history_len;
+    int start_idx = (app->history_pos + 1) % samples;
+    int end_idx = app->history_pos;
+
+    if (app->thread_history) {
+        for (int t = 0; t < app->threads; t++) {
+            unsigned start_v = app->thread_history[t][start_idx];
+            unsigned end_v = app->thread_history[t][end_idx];
+            unsigned diff = (end_v > start_v) ? (end_v - start_v) : 0;
+            if (diffs) diffs[t] = diff;
+            total_diff += diff;
+        }
+    }
+
+    // Second pass: draw graphs
     for (int t=0; t < app->threads; t++){
         worker_status_t status = atomic_load(&app->workers[t].status);
 
@@ -887,7 +912,7 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
             cairo_text_extents(cr, "ALLOCATION FAILED", &extents);
             cairo_move_to(cr, W/2.0 - extents.width/2.0, H/2.0 + extents.height/2.0);
             cairo_show_text(cr, "ALLOCATION FAILED");
-            break; // Only show the failure message
+            break;
         }
         
         const rgba_t c = thread_colors[t % num_colors];
@@ -895,26 +920,21 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
         cairo_set_line_width(cr, 2.5);
         cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
         
-        int samples = app->history_len;
-        double step_x = (samples > 1) ? ((double)W / (samples - 1)) : W;
-        int start_idx = (app->history_pos + 1) % samples;
-        unsigned last_v = 0;
-        if (app->thread_history) {
-            last_v = app->thread_history[t][start_idx];
-        }
+        double step_x = (samples > 1) ? ((double)graph_W / (samples - 1)) : graph_W;
         
-        cairo_move_to(cr, -10, H + 10); // Start off-screen
+        unsigned last_v = app->thread_history ? app->thread_history[t][start_idx] : 0;
+
+        cairo_move_to(cr, -10, H + 10);
 
         for (int s = 0; s < samples; s++) {
             int current_idx = (start_idx + s) % samples;
             unsigned current_v = app->thread_history ? app->thread_history[t][current_idx] : 0;
-            unsigned diff = (current_v > last_v) ? (current_v - last_v) : 0;
+            unsigned diff_hist = (current_v > last_v) ? (current_v - last_v) : 0;
             
-            // Normalize the value to the graph height
-            double y_val = ((double)diff) / (ITER_SCALE * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
+            double sample_interval_sec = (double)CPU_SAMPLE_INTERVAL_MS / 1000.0;
+            double y_val = ((double)diff_hist / sample_interval_sec) / ITER_SCALE;
             double y = H - y_val * H;
-            y = (y < 0) ? 0 : y;
-            y = (y > H) ? H : y;
+            y = fmax(0, fmin(H, y));
             
             cairo_line_to(cr, s * step_x, y);
             last_v = current_v;
@@ -923,21 +943,51 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
     }
     g_mutex_unlock(&app->history_mutex);
 
-    // Legend
+    // --- Legend Table ---
+    double y_pos = 25;
+    double row_h = 22;
+    // Header
+    cairo_set_source_rgba(cr, THEME_TEXT_SECONDARY.r, THEME_TEXT_SECONDARY.g, THEME_TEXT_SECONDARY.b, 1.0);
+    cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+    cairo_set_font_size(cr, 11);
+    cairo_move_to(cr, table_X + 25, y_pos); cairo_show_text(cr, "Thread");
+    cairo_move_to(cr, table_X + 90, y_pos); cairo_show_text(cr, "Iters/s");
+    cairo_move_to(cr, table_X + 160, y_pos); cairo_show_text(cr, "Contrib.");
+    y_pos += row_h;
+
+    // Rows
     for (int t=0; t < app->threads; t++) {
         const rgba_t c = thread_colors[t % num_colors];
         cairo_set_source_rgba(cr, c.r, c.g, c.b, c.a);
-        cairo_rectangle(cr, 15, 15 + t * 20, 12, 12);
+        cairo_rectangle(cr, table_X + 5, y_pos - 12, 12, 12);
         cairo_fill(cr);
 
-        char lbl[32];
-        snprintf(lbl, sizeof(lbl), "Thread %d", t);
+        char lbl[64];
         cairo_set_source_rgba(cr, THEME_TEXT_PRIMARY.r, THEME_TEXT_PRIMARY.g, THEME_TEXT_PRIMARY.b, 1.0);
         cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size(cr, 11);
-        cairo_move_to(cr, 35, 25 + t * 20);
+
+        // Thread ID
+        snprintf(lbl, sizeof(lbl), "%d", t);
+        cairo_move_to(cr, table_X + 25, y_pos);
         cairo_show_text(cr, lbl);
+
+        // Iters/s (raw number)
+        double sample_interval_sec = (double)CPU_SAMPLE_INTERVAL_MS / 1000.0;
+        double iters_s = diffs ? ((double)diffs[t] / sample_interval_sec) : 0.0;
+        snprintf(lbl, sizeof(lbl), "%.0f", iters_s);
+        cairo_move_to(cr, table_X + 90, y_pos);
+        cairo_show_text(cr, lbl);
+
+        // Contribution (%)
+        double percentage = (total_diff > 0 && diffs) ? ((double)diffs[t] * 100.0 / total_diff) : 0.0;
+        snprintf(lbl, sizeof(lbl), "%.1f%%", percentage);
+        cairo_move_to(cr, table_X + 160, y_pos);
+        cairo_show_text(cr, lbl);
+
+        y_pos += row_h;
     }
     
+    free(diffs);
     return FALSE;
 }

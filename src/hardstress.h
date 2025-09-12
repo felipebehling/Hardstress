@@ -36,7 +36,7 @@ typedef struct { unsigned long long user,nice,system,idle,iowait,irq,softirq,ste
 /* --- CONFIGURATION CONSTANTS --- */
 #define DEFAULT_MEM_MIB 256             ///< Default memory to allocate per worker thread in MiB.
 #define DEFAULT_DURATION_SEC 300        ///< Default stress test duration in seconds (5 minutes).
-#define CPU_SAMPLE_INTERVAL_MS 500      ///< Interval for sampling CPU usage and temperature in milliseconds.
+#define CPU_SAMPLE_INTERVAL_MS 1000     ///< Interval for sampling CPU usage and temperature in milliseconds.
 #define HISTORY_SAMPLES 240             ///< Number of historical data points to store for performance graphs.
 #define ITER_SCALE 1000.0               ///< Divisor for scaling iteration counts for display.
 #define TEMP_UNAVAILABLE -274.0         ///< Sentinel value indicating that temperature data is not available.
