@@ -1,0 +1,8 @@
+# Ignore build artifacts
+*.o
+*.exe
+*.test.o
+
+# Ignore executables
+HardStress
+test_runner
