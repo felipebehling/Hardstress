@@ -115,7 +115,19 @@ Yes. The source code is fully available in this repository for auditing. The exe
 
 If you prefer not to run the pre-compiled binary, feel free to compile the project directly from the source code by following the instructions in the "Building from Source" section.
 
-## 5\. Usage Guide
+## 5. Testing
+
+The project includes a suite of unit tests to verify the correctness of core utility functions. These tests ensure that low-level operations like system metric detection and random number generation behave as expected across different platforms.
+
+To build and run the tests, execute the following command from the root directory:
+
+```bash
+make test
+```
+
+The test runner will compile and execute, printing the status of each test to the console. This is a crucial step to perform after making any changes to the `src/utils.c` or `src/metrics.c` files.
+
+## 6. Usage Guide
 
 1.  **Configure Parameters:**
       * **Threads:** Set the number of worker threads (e.g., the number of logical CPU cores).
@@ -127,13 +139,13 @@ If you prefer not to run the pre-compiled binary, feel free to compile the proje
 4.  **Terminate Test:** Click "Stop" to end the test manually. The test will also stop automatically if a duration was set.
 5.  **Export Data:** After a test run, click "Export CSV" to save the collected metrics.
 
-## 6\. Dependencies
+## 7. Dependencies
 
   * **GTK3:** GUI Toolkit.
   * **Cairo:** 2D Graphics Rendering.
   * **pthreads:** (Linux/POSIX) Concurrency support.
   * **PDH Library:** (Windows) System performance counters.
 
-## 7\. License
+## 8. License
 
 This project is licensed under the MIT License. See the `LICENSE` file for full details.
