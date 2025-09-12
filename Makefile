@@ -31,8 +31,8 @@ HARU_LIBS   := $(shell $(PKG_CONFIG) --libs libharu)
 # Flags de compilação e linkagem por plataforma
 ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
-    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HARU_CFLAGS) -D_WIN32_DCOM -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) $(HARU_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows
+    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HARU_CFLAGS) -D_WIN32 -D_WIN32_DCOM -I$(SRC_DIR)
+    LDFLAGS = $(GTK_LIBS) $(HARU_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows -lhpdf
 else
     # Linux/Outros
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HARU_CFLAGS) -I$(SRC_DIR)
@@ -54,7 +54,7 @@ TEST_OBJS = $(TEST_SRCS:.c=.o) $(APP_TEST_SRCS:.c=.test.o)
 
 # Flags de compilação para testes
 ifeq ($(OS),Windows_NT)
-    TEST_CFLAGS = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR) -D_WIN32_DCOM -DTESTING_BUILD
+    TEST_CFLAGS = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR) -D_WIN32 -D_WIN32_DCOM -DTESTING_BUILD
     TEST_LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32
 else
     # Linux/Outros
