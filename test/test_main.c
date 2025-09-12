@@ -10,6 +10,7 @@ void test_get_total_system_memory();
 void test_now_sec();
 void test_splitmix64();
 void test_shuffle32();
+void run_metrics_tests(); // From test_metrics.c
 
 int main() {
     printf("Running tests...\n");
@@ -19,6 +20,7 @@ int main() {
     test_now_sec();
     test_splitmix64();
     test_shuffle32();
+    run_metrics_tests();
 
     printf("\nAll tests passed!\n");
     return 0;

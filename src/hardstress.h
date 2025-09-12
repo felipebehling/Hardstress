@@ -18,7 +18,7 @@
 #else
 #include <pthread.h>
 #include <unistd.h>
-typedef struct { unsigned long long user,nice,system,idle,iowait,irq,softirq,steal; } cpu_sample_t;
+typedef struct { unsigned long long user,nice,system,idle,iowait,irq,softirq,steal,guest,guest_nice; } cpu_sample_t;
 #endif
 
 #include <gtk/gtk.h>

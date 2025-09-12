@@ -102,10 +102,12 @@ int read_proc_stat(cpu_sample_t *out, int maxcpu, const char *path) {
         if (strncmp(line, "cpu", 3) != 0) break;
         if (strncmp(line, "cpu ", 4) == 0) continue;
 
-        sscanf(line, "cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu",
+        // Read all 10 fields from /proc/stat. guest and guest_nice are included.
+        sscanf(line, "cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
                &out[count].user, &out[count].nice, &out[count].system,
                &out[count].idle, &out[count].iowait, &out[count].irq,
-               &out[count].softirq, &out[count].steal);
+               &out[count].softirq, &out[count].steal, &out[count].guest,
+               &out[count].guest_nice);
         count++;
 
     }
@@ -123,8 +125,8 @@ int read_proc_stat(cpu_sample_t *out, int maxcpu, const char *path) {
 double compute_usage(const cpu_sample_t *a,const cpu_sample_t *b){
     unsigned long long idle_a=a->idle + a->iowait;
     unsigned long long idle_b=b->idle + b->iowait;
-    unsigned long long nonidle_a=a->user + a->nice + a->system + a->irq + a->softirq + a->steal;
-    unsigned long long nonidle_b=b->user + b->nice + b->system + b->irq + b->softirq + b->steal;
+    unsigned long long nonidle_a=a->user + a->nice + a->system + a->irq + a->softirq + a->steal + a->guest + a->guest_nice;
+    unsigned long long nonidle_b=b->user + b->nice + b->system + b->irq + b->softirq + b->steal + b->guest + b->guest_nice;
 
     unsigned long long total_a = idle_a + nonidle_a;
     unsigned long long total_b = idle_b + nonidle_b;
