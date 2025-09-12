@@ -63,7 +63,7 @@ sudo apt install lm-sensors
 Install the MSYS2 environment. From the MSYS2 MINGW64 terminal, install the necessary toolchain and libraries:
 
 ```bash
-pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-gtk3 pkg-config
+pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-gtk3 mingw-w64-x86_64-libharu pkg-config
 ```
 
 ### 4.2. Building from Source
@@ -130,6 +130,7 @@ If you prefer not to run the pre-compiled binary, feel free to compile the proje
 
   * **GTK3:** GUI Toolkit.
   * **Cairo:** 2D Graphics Rendering.
+  * **libharu:** PDF Exporting.
   * **pthreads:** (Linux/POSIX) Concurrency support.
   * **PDH Library:** (Windows) System performance counters.
 

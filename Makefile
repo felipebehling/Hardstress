@@ -27,6 +27,17 @@ GTK_LIBS   := $(shell $(PKG_CONFIG) --libs gtk+-3.0)
 HPDF_CFLAGS := $(shell $(PKG_CONFIG) --cflags libhpdf)
 HPDF_LIBS   := $(shell $(PKG_CONFIG) --libs libhpdf)
 
+# Fallback for libhpdf if pkg-config fails
+ifeq ($(strip $(HPDF_LIBS)),)
+    $(warning "---")
+    $(warning "Warning: pkg-config could not find libhpdf.")
+    $(warning "Falling back to default linker flags. If the build fails with 'hpdf.h not found',")
+    $(warning "you may need to provide the library path manually. For example:")
+    $(warning "  make HPDF_CFLAGS=\"-I/path/to/include\" HPDF_LIBS=\"-L/path/to/lib -lhpdf\"")
+    $(warning "---")
+    HPDF_LIBS := -lhpdf
+endif
+
 # Flags de compilação e linkagem por plataforma
 ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
