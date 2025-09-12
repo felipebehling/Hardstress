@@ -21,24 +21,20 @@ endif
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(SRCS:.c=.o)
 
+# --- Library Config ---
 PKG_CONFIG ?= pkg-config
 GTK_CFLAGS := $(shell $(PKG_CONFIG) --cflags gtk+-3.0)
 GTK_LIBS   := $(shell $(PKG_CONFIG) --libs gtk+-3.0)
-HPDF_CFLAGS := $(shell $(PKG_CONFIG) --cflags libhpdf)
-HPDF_LIBS   := $(shell $(PKG_CONFIG) --libs libhpdf)
 
-# Fallback for libhpdf if pkg-config fails
-ifeq ($(strip $(HPDF_LIBS)),)
-    $(warning "---")
-    $(warning "Warning: pkg-config could not find libhpdf.")
-    $(warning "Falling back to default linker flags. If the build fails with 'hpdf.h not found',")
-    $(warning "you may need to provide the library path manually. For example:")
-    $(warning "  make HPDF_CFLAGS=\"-I/path/to/include\" HPDF_LIBS=\"-L/path/to/lib -lhpdf\"")
-    $(warning "---")
-    HPDF_LIBS := -lhpdf
-endif
+# --- Vendored Dependencies ---
+VENDOR_DIR = vendor
+HPDF_SRC_DIR = $(VENDOR_DIR)/libharu
+HPDF_BUILD_DIR = $(HPDF_SRC_DIR)/build
+HPDF_LIB = $(HPDF_BUILD_DIR)/src/libhpdf.a
+HPDF_CFLAGS = -I$(HPDF_SRC_DIR)/include
+HPDF_LIBS = -L$(HPDF_BUILD_DIR)/src -lhpdf
 
-# Flags de compilação e linkagem por plataforma
+# --- Flags de compilação e linkagem por plataforma ---
 ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HPDF_CFLAGS) -D_WIN32_DCOM -I$(SRC_DIR)
@@ -78,8 +74,18 @@ endif
 
 all: $(TARGET)$(TARGET_EXT)
 
-$(TARGET)$(TARGET_EXT): $(OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+$(TARGET)$(TARGET_EXT): $(OBJS) $(HPDF_LIB)
+	$(CC) -o $(TARGET)$(TARGET_EXT) $(OBJS) $(LDFLAGS)
+
+$(HPDF_LIB):
+	@echo "--- Building libharu dependency ---"
+	@if [ ! -d "$(HPDF_SRC_DIR)" ]; then \
+		echo "Cloning libharu..."; \
+		git clone https://github.com/libharu/libharu.git $(HPDF_SRC_DIR); \
+	fi
+	@mkdir -p $(HPDF_BUILD_DIR)
+	@cd $(HPDF_BUILD_DIR) && cmake .. && cmake --build .
+	@echo "--- Finished building libharu ---"
 
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<

@@ -1,0 +1,12 @@
+# Ignore vendored dependencies
+/vendor/
+
+# Ignore build artifacts
+*.o
+*.exe
+test_runner
+test_output.pdf
+test_pdf_export_runner
+
+# Ignore local config
+.vscode/

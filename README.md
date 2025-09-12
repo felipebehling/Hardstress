@@ -49,7 +49,7 @@ A C compiler (`build-essential`), the GTK3 development libraries, and the Haru P
 
 ```bash
 sudo apt update
-sudo apt install build-essential libgtk-3-dev libhpdf-dev
+sudo apt install build-essential libgtk-3-dev git cmake
 ```
 
 For temperature monitoring, `lm-sensors` is recommended:
@@ -63,12 +63,12 @@ sudo apt install lm-sensors
 Install the MSYS2 environment. From the MSYS2 MINGW64 terminal, install the necessary toolchain and libraries:
 
 ```bash
-pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-gtk3 mingw-w64-x86_64-libharu pkg-config
+pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-gtk3 pkg-config git cmake
 ```
 
 ### 4.2. Building from Source
 
-The project includes a `Makefile` that automates the compilation process.
+The project includes a `Makefile` that automates the compilation process. The first time you build, the `Makefile` will also automatically download and compile the `libharu` PDF library, which requires `git` and `cmake` to be installed.
 
 1.  **Clone the repository:**
 
@@ -130,7 +130,6 @@ If you prefer not to run the pre-compiled binary, feel free to compile the proje
 
   * **GTK3:** GUI Toolkit.
   * **Cairo:** 2D Graphics Rendering.
-  * **libharu:** PDF Exporting.
   * **pthreads:** (Linux/POSIX) Concurrency support.
   * **PDH Library:** (Windows) System performance counters.
 
