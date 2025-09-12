@@ -47,12 +47,5 @@ void gui_log(AppContext *app, const char *fmt, ...);
  */
 gboolean gui_update_stopped(gpointer ud);
 
-/**
- * @brief Exports the collected performance metrics to a PDF file.
- *
- * @param filename The path to the output PDF file.
- * @param app A pointer to the global `AppContext` structure.
- */
-void export_to_pdf_metrics(const char *filename, AppContext *app);
 
 #endif // UI_H

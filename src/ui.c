@@ -5,7 +5,6 @@
 #include "utils.h"
 #include <math.h>
 #include <time.h>
-#include <hpdf.h>
 #include <errno.h>
 
 /* --- Dark Theme Color Definitions --- */
@@ -657,7 +656,7 @@ static void set_controls_sensitive(AppContext *app, gboolean state){
  * @brief Displays a file chooser dialog for exporting metrics.
  *
  * Allows the user to save the collected performance data to a file in
- * PDF, CSV, or TXT format.
+ * CSV or TXT format.
  */
 static void export_metrics_dialog(AppContext *app){
     GtkWidget *dialog = gtk_file_chooser_dialog_new("Save Metrics",
@@ -665,11 +664,6 @@ static void export_metrics_dialog(AppContext *app){
         GTK_FILE_CHOOSER_ACTION_SAVE,
         "_Cancel", GTK_RESPONSE_CANCEL,
         "_Save", GTK_RESPONSE_ACCEPT, NULL);
-
-    GtkFileFilter *filter_pdf = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter_pdf, "PDF Document (*.pdf)");
-    gtk_file_filter_add_pattern(filter_pdf, "*.pdf");
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_pdf);
 
     GtkFileFilter *filter_csv = gtk_file_filter_new();
     gtk_file_filter_set_name(filter_csv, "CSV File (*.csv)");
@@ -682,15 +676,13 @@ static void export_metrics_dialog(AppContext *app){
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter_txt);
 
     char default_name[64];
-    snprintf(default_name, sizeof(default_name), "HardStress_Metrics_%.0f.pdf", (double)time(NULL));
+    snprintf(default_name, sizeof(default_name), "HardStress_Metrics_%.0f.csv", (double)time(NULL));
     gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), default_name);
 
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT){
         char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
 
-        if (g_str_has_suffix(filename, ".pdf")) {
-            export_to_pdf_metrics(filename, app);
-        } else if (g_str_has_suffix(filename, ".csv")) {
+        if (g_str_has_suffix(filename, ".csv")) {
             export_to_csv_metrics(filename, app);
         } else if (g_str_has_suffix(filename, ".txt")) {
             export_to_txt_metrics(filename, app);
@@ -760,76 +752,6 @@ static void export_to_txt_metrics(const char *filename, AppContext *app) {
     g_mutex_unlock(&app->history_mutex);
 
     fclose(f);
-}
-
-/**
- * @brief Exports the collected thread performance history to a PDF file.
- */
-void export_to_pdf_metrics(const char *filename, AppContext *app) {
-    HPDF_Doc pdf = HPDF_New(NULL, NULL);
-    if (!pdf) {
-        return;
-    }
-    HPDF_Page page = HPDF_AddPage(pdf);
-    HPDF_Font font = HPDF_GetFont(pdf, "Helvetica", NULL);
-
-    float y = 750;
-
-    // --- Draw Header ---
-    HPDF_Page_SetFontAndSize(page, font, 10);
-    HPDF_Page_BeginText(page);
-    HPDF_Page_MoveTextPos(page, 50, y);
-    HPDF_Page_ShowText(page, "timestamp_sec");
-
-    float x_pos = 150;
-    for (int t=0; t<app->threads; t++) {
-        char header[32];
-        snprintf(header, sizeof(header), "thread%d_iters_total", t);
-        HPDF_Page_MoveTextPos(page, x_pos, y);
-        HPDF_Page_ShowText(page, header);
-        x_pos += 100;
-    }
-    HPDF_Page_EndText(page);
-    y -= 20;
-
-    // --- Draw Data Rows ---
-    g_mutex_lock(&app->history_mutex);
-    if(app->thread_history) {
-        for (int s=0; s<app->history_len; s++){
-            // Check for page break BEFORE drawing the row
-            if (y < 50) {
-                page = HPDF_AddPage(pdf);
-                HPDF_Page_SetFontAndSize(page, font, 10);
-                y = 750;
-            }
-
-            int idx = (app->history_pos + 1 + s) % app->history_len;
-            char val[32];
-
-            // Begin a new text object for each row
-            HPDF_Page_BeginText(page);
-
-            // First column (timestamp)
-            HPDF_Page_MoveTextPos(page, 50, y);
-            snprintf(val, sizeof(val), "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
-            HPDF_Page_ShowText(page, val);
-
-            // Subsequent columns (thread data)
-            x_pos = 150;
-            for (int t=0; t<app->threads; t++) {
-                HPDF_Page_MoveTextPos(page, x_pos, y);
-                snprintf(val, sizeof(val), "%u", app->thread_history[t][idx]);
-                HPDF_Page_ShowText(page, val);
-                x_pos += 100;
-            }
-
-            HPDF_Page_EndText(page);
-            y -= 12; // Decrement y for the next row
-        }
-    }
-    g_mutex_unlock(&app->history_mutex);
-    HPDF_SaveToFile(pdf, filename);
-    HPDF_Free(pdf);
 }
 
 /**

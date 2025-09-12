@@ -24,19 +24,17 @@ OBJS = $(SRCS:.c=.o)
 PKG_CONFIG ?= pkg-config
 GTK_CFLAGS := $(shell $(PKG_CONFIG) --cflags gtk+-3.0)
 GTK_LIBS   := $(shell $(PKG_CONFIG) --libs gtk+-3.0)
-HARU_CFLAGS := $(shell $(PKG_CONFIG) --cflags libharu)
-HARU_LIBS   := $(shell $(PKG_CONFIG) --libs libharu)
 
 
 # Flags de compilação e linkagem por plataforma
 ifeq ($(OS),Windows_NT)
     # Windows (MSYS2/MinGW)
-    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HARU_CFLAGS) -D_WIN32 -D_WIN32_DCOM -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) $(HARU_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows -lhpdf
+    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -D_WIN32 -D_WIN32_DCOM -I$(SRC_DIR)
+    LDFLAGS = $(GTK_LIBS) -lpthread -lm -lpdh -lole32 -lwbemuuid -loleaut32 -mwindows
 else
     # Linux/Outros
-    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HARU_CFLAGS) -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) $(HARU_LIBS) -lpthread -lm -lhpdf
+    CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) -I$(SRC_DIR)
+    LDFLAGS = $(GTK_LIBS) -lpthread -lm
 endif
 
 CFLAGS_DEBUG = -O2 -g
