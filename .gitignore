@@ -1,0 +1,14 @@
+# Build artifacts
+*.o
+*.test.o
+HardStress
+HardStress.exe
+test_runner
+test_runner.exe
+test_output.pdf
+
+# Editor/OS files
+.vscode/
+*.swp
+*~
+.DS_Store
