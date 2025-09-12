@@ -40,7 +40,6 @@ static void on_window_destroy(GtkWidget *w, gpointer ud);
 static gboolean ui_tick(gpointer ud);
 static void set_controls_sensitive(AppContext *app, gboolean state);
 static void export_metrics_dialog(AppContext *app);
-static void export_to_pdf_metrics(const char *filename, AppContext *app);
 static void export_to_csv_metrics(const char *filename, AppContext *app);
 static void export_to_txt_metrics(const char *filename, AppContext *app);
 static gboolean gui_update_started(gpointer ud);
@@ -148,6 +147,7 @@ static void on_window_destroy(GtkWidget *w, gpointer ud) {
     gtk_main_quit();
 }
 
+#ifndef TESTING_BUILD
 /**
  * @brief Appends a formatted, timestamped message to the GUI log.
  */
@@ -175,6 +175,7 @@ void gui_log(AppContext *app, const char *fmt, ...){
     gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(app->log_view), mark, 0.0, TRUE, 0.0, 1.0);
     gtk_text_buffer_delete_mark(app->log_buffer, mark);
 }
+#endif
 
 /**
  * @brief GSourceFunc to update the GUI when a test starts.
@@ -726,58 +727,69 @@ static void export_to_txt_metrics(const char *filename, AppContext *app) {
 /**
  * @brief Exports the collected thread performance history to a PDF file.
  */
-static void export_to_pdf_metrics(const char *filename, AppContext *app) {
+void export_to_pdf_metrics(const char *filename, AppContext *app) {
     HPDF_Doc pdf = HPDF_New(NULL, NULL);
     if (!pdf) {
         return;
     }
     HPDF_Page page = HPDF_AddPage(pdf);
     HPDF_Font font = HPDF_GetFont(pdf, "Helvetica", NULL);
-    HPDF_Page_SetFontAndSize(page, font, 10);
-    HPDF_Page_BeginText(page);
-    HPDF_Page_MoveTextPos(page, 50, 750);
-    HPDF_Page_SetTextLeading(page, 12);
 
     float y = 750;
-    HPDF_Page_MoveTextPos(page, 50, y);
 
+    // --- Draw Header ---
+    HPDF_Page_SetFontAndSize(page, font, 10);
+    HPDF_Page_BeginText(page);
+    HPDF_Page_MoveTextPos(page, 50, y);
     HPDF_Page_ShowText(page, "timestamp_sec");
+
+    float x_pos = 150;
     for (int t=0; t<app->threads; t++) {
         char header[32];
         snprintf(header, sizeof(header), "thread%d_iters_total", t);
-        HPDF_Page_MoveTextPos(page, 150 + t * 100, y);
+        HPDF_Page_MoveTextPos(page, x_pos, y);
         HPDF_Page_ShowText(page, header);
+        x_pos += 100;
     }
+    HPDF_Page_EndText(page);
     y -= 20;
 
+    // --- Draw Data Rows ---
     g_mutex_lock(&app->history_mutex);
     if(app->thread_history) {
         for (int s=0; s<app->history_len; s++){
+            // Check for page break BEFORE drawing the row
+            if (y < 50) {
+                page = HPDF_AddPage(pdf);
+                HPDF_Page_SetFontAndSize(page, font, 10);
+                y = 750;
+            }
+
             int idx = (app->history_pos + 1 + s) % app->history_len;
             char val[32];
 
+            // Begin a new text object for each row
+            HPDF_Page_BeginText(page);
+
+            // First column (timestamp)
             HPDF_Page_MoveTextPos(page, 50, y);
             snprintf(val, sizeof(val), "%.3f", (double)s * (CPU_SAMPLE_INTERVAL_MS / 1000.0));
             HPDF_Page_ShowText(page, val);
 
+            // Subsequent columns (thread data)
+            x_pos = 150;
             for (int t=0; t<app->threads; t++) {
-                HPDF_Page_MoveTextPos(page, 150 + t * 100, y);
+                HPDF_Page_MoveTextPos(page, x_pos, y);
                 snprintf(val, sizeof(val), "%u", app->thread_history[t][idx]);
                 HPDF_Page_ShowText(page, val);
+                x_pos += 100;
             }
-            y -= 12;
-            if (y < 50) {
-                HPDF_Page_EndText(page);
-                page = HPDF_AddPage(pdf);
-                HPDF_Page_SetFontAndSize(page, font, 10);
-                HPDF_Page_BeginText(page);
-                y = 750;
-            }
+
+            HPDF_Page_EndText(page);
+            y -= 12; // Decrement y for the next row
         }
     }
     g_mutex_unlock(&app->history_mutex);
-
-    HPDF_Page_EndText(page);
     HPDF_SaveToFile(pdf, filename);
     HPDF_Free(pdf);
 }
