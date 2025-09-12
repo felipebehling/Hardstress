@@ -36,7 +36,7 @@ ifeq ($(OS),Windows_NT)
 else
     # Linux/Outros
     CFLAGS_COMMON = -Wall -std=gnu11 $(GTK_CFLAGS) $(HARU_CFLAGS) -I$(SRC_DIR)
-    LDFLAGS = $(GTK_LIBS) $(HARU_LIBS) -lpthread -lm
+    LDFLAGS = $(GTK_LIBS) $(HARU_LIBS) -lpthread -lm -lhpdf
 endif
 
 CFLAGS_DEBUG = -O2 -g

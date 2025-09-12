@@ -102,12 +102,14 @@ int read_proc_stat(cpu_sample_t *out, int maxcpu, const char *path) {
         if (strncmp(line, "cpu", 3) != 0) break;
         if (strncmp(line, "cpu ", 4) == 0) continue;
 
-        sscanf(line, "cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu",
+        int items = sscanf(line, "cpu%*d %llu %llu %llu %llu %llu %llu %llu %llu",
                &out[count].user, &out[count].nice, &out[count].system,
                &out[count].idle, &out[count].iowait, &out[count].irq,
                &out[count].softirq, &out[count].steal);
-        count++;
 
+        if (items == 8) {
+            count++;
+        }
     }
     fclose(f);
     return count;
