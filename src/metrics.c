@@ -10,12 +10,6 @@ static void wmi_init(AppContext *app);
 static void wmi_deinit(AppContext *app);
 static void sample_temp_windows(AppContext *app);
 #else
-
-#else
-static void sample_cpu_linux(AppContext *app);
-static void sample_temp_linux(AppContext *app);
-#endif
-
 static void sample_cpu_linux(AppContext *app);
 static void sample_temp_linux(AppContext *app);
 #endif
