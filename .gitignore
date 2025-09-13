@@ -1,0 +1,15 @@
+# Object files
+*.o
+*.test.o
+
+# Executables
+HardStress
+HardStress.exe
+test_runner
+test_runner.exe
+
+# Log files
+*.log
+
+# Test artifacts
+temp_test_log.csv

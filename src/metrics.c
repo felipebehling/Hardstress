@@ -360,11 +360,15 @@ static void log_csv_sample(AppContext *app) {
     for (int c = 0; c < app->cpu_count; c++) fprintf(app->csv_log_file, ",%.6f", app->cpu_usage[c]);
     g_mutex_unlock(&app->cpu_mutex);
 
-    // The history buffer stores the total iteration count, which is what we want to log.
+    // The history buffer stores the total iteration count. We need to log the
+    // value from the *previous* sample period, as the current one has just
+    // been zeroed out by the sampler thread.
     g_mutex_lock(&app->history_mutex);
-    int current_pos = app->history_pos; // The position that was just updated
-    if(app->thread_history) {
-      for (int t = 0; t < app->threads; t++) fprintf(app->csv_log_file, ",%u", app->thread_history[t][current_pos]);
+    if (app->thread_history) {
+        int log_pos = (app->history_pos - 1 + app->history_len) % app->history_len;
+        for (int t = 0; t < app->threads; t++) {
+            fprintf(app->csv_log_file, ",%u", app->thread_history[t][log_pos]);
+        }
     }
     g_mutex_unlock(&app->history_mutex);
     
