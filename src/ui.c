@@ -581,9 +581,15 @@ GtkWidget* create_main_window(AppContext *app) {
 
     // CPU Graph
     GtkWidget *cpu_frame = gtk_frame_new("CPU Utilization per Core");
+    GtkWidget *scrolled_cpu = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_cpu), GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
+
     app->cpu_drawing = gtk_drawing_area_new();
+    // Height is fixed, width will be set dynamically in the draw handler
     gtk_widget_set_size_request(app->cpu_drawing, -1, 150);
-    gtk_container_add(GTK_CONTAINER(cpu_frame), app->cpu_drawing);
+
+    gtk_container_add(GTK_CONTAINER(scrolled_cpu), app->cpu_drawing);
+    gtk_container_add(GTK_CONTAINER(cpu_frame), scrolled_cpu);
     gtk_box_pack_start(GTK_BOX(main_area), cpu_frame, FALSE, FALSE, 0);
 
     // Iterations Graph
@@ -763,23 +769,35 @@ static void export_to_txt_metrics(const char *filename, AppContext *app) {
  */
 static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
     AppContext *app = (AppContext*)user_data;
+
+    // Define minimum dimensions for the CPU bars for readability
+    const double min_bar_width = 20.0;
+    const double bar_spacing = 8.0;
+
+    int n = app->cpu_count > 0 ? app->cpu_count : 1;
+    // Calculate the required width to display all bars without squeezing
+    int required_w = n * (min_bar_width + bar_spacing) + bar_spacing;
+
     GtkAllocation alloc; 
     gtk_widget_get_allocation(widget, &alloc);
-    int w = alloc.width, h = alloc.height;
+    int h = alloc.height;
+
+    // Set the size request of the drawing area. If required_w is larger than the
+    // space available in the scrolled window, scrollbars will appear.
+    gtk_widget_set_size_request(widget, required_w, -1);
 
     cairo_set_antialias(cr, CAIRO_ANTIALIAS_DEFAULT);
 
     // Background
     cairo_set_source_rgba(cr, THEME_BG_SECONDARY.r, THEME_BG_SECONDARY.g, THEME_BG_SECONDARY.b, THEME_BG_SECONDARY.a);
-    draw_rounded_rect(cr, 0, 0, w, h, 8.0);
+    draw_rounded_rect(cr, 0, 0, required_w, h, 8.0);
     cairo_fill(cr);
 
     // Grid
-    draw_grid_background(cr, w, h - 25, 20);
+    draw_grid_background(cr, required_w, h - 25, 20);
 
-    int n = app->cpu_count > 0 ? app->cpu_count : 1;
-    double spacing = 8.0;
-    double bw = (w - (n + 1) * spacing) / n;
+    double bw = min_bar_width;
+    double spacing = bar_spacing;
 
     g_mutex_lock(&app->cpu_mutex);
     for (int i=0; i<n; i++){
@@ -885,17 +903,20 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
 
     g_mutex_lock(&app->history_mutex);
 
-    // First pass: calculate diffs and total_diff
-    int samples = app->history_len;
-    int start_idx = (app->history_pos + 1) % samples;
-    int end_idx = app->history_pos;
+    // First pass: calculate diffs for the most recent sample period
+    if (diffs && app->thread_history) {
+        int current_pos = app->history_pos;
+        // The history buffer is circular. To get the previous position, we wrap around.
+        int prev_pos = (current_pos - 1 + app->history_len) % app->history_len;
 
-    if (app->thread_history) {
         for (int t = 0; t < app->threads; t++) {
-            unsigned start_v = app->thread_history[t][start_idx];
-            unsigned end_v = app->thread_history[t][end_idx];
-            unsigned diff = (end_v > start_v) ? (end_v - start_v) : 0;
-            if (diffs) diffs[t] = diff;
+            // The values in thread_history are cumulative, so we subtract the
+            // previous sample's total from the current one to get the delta.
+            unsigned current_total = app->thread_history[t][current_pos];
+            unsigned prev_total = app->thread_history[t][prev_pos];
+            unsigned diff = (current_total > prev_total) ? (current_total - prev_total) : 0;
+
+            diffs[t] = diff;
             total_diff += diff;
         }
     }
