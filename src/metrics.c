@@ -249,9 +249,9 @@ static int pdh_init_query(AppContext *app) {
     for (int i = 0; i < app->cpu_count; i++) {
         char path[PDH_MAX_COUNTER_PATH];
         snprintf(path, sizeof(path), "\\Processor(%d)\\%% Processor Time", i);
-        status = PdhAddCounterA(app->pdh_query, path, 0, &app->pdh_counters[i]);
+        status = PdhAddEnglishCounterA(app->pdh_query, path, 0, &app->pdh_counters[i]);
         if (status != ERROR_SUCCESS) {
-            log_pdh_error(status, "PdhAddCounterA");
+            log_pdh_error(status, "PdhAddEnglishCounterA");
             // Cleanup on failure
             for (int j = 0; j < i; j++) PdhRemoveCounter(app->pdh_counters[j]);
             free(app->pdh_counters);
