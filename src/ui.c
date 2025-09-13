@@ -451,8 +451,8 @@ GtkWidget* create_main_window(AppContext *app) {
     // Panel Title
     GtkWidget *title = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(title), 
-        "<span font='Inter Bold 18' foreground='#00bfff'>HardStress</span>\n"
-        "<span font='Inter 10' foreground='#a0a0a0'>Stress Testing System</span>");
+        "<span font='Sans Bold 18' foreground='#00bfff'>HardStress</span>\n"
+        "<span font='Sans 10' foreground='#a0a0a0'>Stress Testing System</span>");
     gtk_label_set_justify(GTK_LABEL(title), GTK_JUSTIFY_LEFT);
     gtk_widget_set_halign(title, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(sidebar), title, FALSE, FALSE, 0);
@@ -807,7 +807,7 @@ static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
         char txt[32]; 
         snprintf(txt, sizeof(txt), "%.0f%%", u * 100.0);
         cairo_set_source_rgba(cr, THEME_TEXT_PRIMARY.r, THEME_TEXT_PRIMARY.g, THEME_TEXT_PRIMARY.b, 0.9);
-        cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
         cairo_set_font_size(cr, 12);
         cairo_text_extents_t extents;
         cairo_text_extents(cr, txt, &extents);
@@ -817,7 +817,7 @@ static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
         // Core label below the bar
         snprintf(txt, sizeof(txt), "CPU %d", i);
         cairo_set_source_rgba(cr, THEME_TEXT_SECONDARY.r, THEME_TEXT_SECONDARY.g, THEME_TEXT_SECONDARY.b, 1.0);
-        cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size(cr, 10);
         cairo_text_extents(cr, txt, &extents);
         cairo_move_to(cr, x + (bw / 2.0) - (extents.width / 2.0), h - 8);
@@ -834,7 +834,7 @@ static gboolean on_draw_cpu(GtkWidget *widget, cairo_t *cr, gpointer user_data){
         char tbuf[64]; 
         snprintf(tbuf, sizeof(tbuf), "🌡️ %.1f °C", temp);
         cairo_set_source_rgba(cr, THEME_WARN.r, THEME_WARN.g, THEME_WARN.b, 1.0);
-        cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
         cairo_set_font_size(cr, 12);
         cairo_text_extents_t extents;
         cairo_text_extents(cr, tbuf, &extents);
@@ -906,7 +906,7 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
 
         if (status == WORKER_ALLOC_FAIL) {
             cairo_set_source_rgba(cr, THEME_ERROR.r, THEME_ERROR.g, THEME_ERROR.b, 1.0);
-            cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+            cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
             cairo_set_font_size(cr, 16);
             cairo_text_extents_t extents;
             cairo_text_extents(cr, "ALLOCATION FAILED", &extents);
@@ -948,7 +948,7 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
     double row_h = 22;
     // Header
     cairo_set_source_rgba(cr, THEME_TEXT_SECONDARY.r, THEME_TEXT_SECONDARY.g, THEME_TEXT_SECONDARY.b, 1.0);
-    cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
     cairo_set_font_size(cr, 11);
     cairo_move_to(cr, table_X + 25, y_pos); cairo_show_text(cr, "Thread");
     cairo_move_to(cr, table_X + 90, y_pos); cairo_show_text(cr, "Iters/s");
@@ -964,7 +964,7 @@ static gboolean on_draw_iters(GtkWidget *widget, cairo_t *cr, gpointer user_data
 
         char lbl[64];
         cairo_set_source_rgba(cr, THEME_TEXT_PRIMARY.r, THEME_TEXT_PRIMARY.g, THEME_TEXT_PRIMARY.b, 1.0);
-        cairo_select_font_face(cr, "Inter", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size(cr, 11);
 
         // Thread ID

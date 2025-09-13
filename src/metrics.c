@@ -203,30 +203,73 @@ static void sample_temp_linux(AppContext *app){
 #else /* --- WINDOWS IMPLEMENTATION --- */
 
 /**
+ * @brief Logs a detailed error message for a PDH status code.
+ *
+ * This function converts a PDH_STATUS code into a human-readable string
+ * using the FormatMessage API and prints it to stderr.
+ *
+ * @param status The PDH_STATUS code to log.
+ * @param function_name The name of the PDH function that failed.
+ */
+static void log_pdh_error(PDH_STATUS status, const char* function_name) {
+    LPSTR buffer = NULL;
+    DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_IGNORE_INSERTS;
+    HMODULE pdh_module = GetModuleHandleA("pdh.dll");
+
+    if (FormatMessageA(flags, pdh_module, status, 0, (LPSTR)&buffer, 0, NULL)) {
+        fprintf(stderr, "[ERROR] PDH function '%s' failed with code 0x%08lx: %s", function_name, status, buffer);
+        LocalFree(buffer);
+    } else {
+        fprintf(stderr, "[ERROR] PDH function '%s' failed with code 0x%08lx. (Could not format message)\n", function_name, status);
+    }
+}
+
+/**
  * @brief Initializes the PDH (Performance Data Helper) query for CPU usage.
  *
  * Sets up a PDH query and adds a counter for "% Processor Time" for each
  * logical processor on the system.
  */
-static int pdh_init_query(AppContext *app){
-    if (PdhOpenQuery(NULL, 0, &app->pdh_query) != ERROR_SUCCESS) return -1;
+static int pdh_init_query(AppContext *app) {
+    PDH_STATUS status;
+
+    status = PdhOpenQuery(NULL, 0, &app->pdh_query);
+    if (status != ERROR_SUCCESS) {
+        log_pdh_error(status, "PdhOpenQuery");
+        return -1;
+    }
+
     app->pdh_counters = calloc(app->cpu_count, sizeof(PDH_HCOUNTER));
     if (!app->pdh_counters) {
+        fprintf(stderr, "[ERROR] Failed to allocate memory for PDH counters.\n");
         PdhCloseQuery(app->pdh_query);
         return -1;
     }
+
     for (int i = 0; i < app->cpu_count; i++) {
-        char path[256];
+        char path[PDH_MAX_COUNTER_PATH];
         snprintf(path, sizeof(path), "\\Processor(%d)\\%% Processor Time", i);
-        if (PdhAddCounterA(app->pdh_query, path, 0, &app->pdh_counters[i]) != ERROR_SUCCESS) {
+        status = PdhAddCounterA(app->pdh_query, path, 0, &app->pdh_counters[i]);
+        if (status != ERROR_SUCCESS) {
+            log_pdh_error(status, "PdhAddCounterA");
             // Cleanup on failure
             for (int j = 0; j < i; j++) PdhRemoveCounter(app->pdh_counters[j]);
-            free(app->pdh_counters); app->pdh_counters = NULL;
-            PdhCloseQuery(app->pdh_query); app->pdh_query = NULL;
+            free(app->pdh_counters);
+            app->pdh_counters = NULL;
+            PdhCloseQuery(app->pdh_query);
+            app->pdh_query = NULL;
             return -1;
         }
     }
-    return PdhCollectQueryData(app->pdh_query); // Initial collection
+
+    status = PdhCollectQueryData(app->pdh_query); // Initial collection
+    if (status != ERROR_SUCCESS) {
+        log_pdh_error(status, "PdhCollectQueryData");
+        // Don't treat initial collection failure as fatal, but log it.
+        // The sampler loop might recover.
+    }
+
+    return ERROR_SUCCESS;
 }
 
 /**
