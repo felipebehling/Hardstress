@@ -12,6 +12,7 @@ void test_get_total_system_memory();
 void test_now_sec();
 void test_splitmix64();
 void test_shuffle32();
+void test_shuffle32_null_robustness();
 void test_csv_logging_bug();
 
 int main() {
@@ -22,6 +23,7 @@ int main() {
     test_now_sec();
     test_splitmix64();
     test_shuffle32();
+    test_shuffle32_null_robustness();
     test_csv_logging_bug();
 
     printf("\nAll tests passed!\n");
@@ -175,4 +177,15 @@ void test_csv_logging_bug() {
     }
     free(app.thread_history);
     free(app.cpu_usage);
+}
+
+void test_shuffle32_null_robustness() {
+    printf("\n- Running test_shuffle32_null_robustness...\n");
+    uint64_t seed = 123;
+    // This call should not crash the program.
+    // The function should gracefully handle the NULL pointer.
+    shuffle32(NULL, 10, &seed);
+    shuffle32(NULL, 0, &seed);
+    shuffle32(NULL, 1, &seed);
+    printf("  - PASSED: shuffle32 handled NULL pointer without crashing.\n");
 }
