@@ -55,7 +55,7 @@ Install the [MSYS2](https://www.msys2.org/) environment. From the MSYS2 MINGW64 
 ```bash
 pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-gtk3 mingw-w64-x86_64-libharu pkg-config
 ```
-> **Note for Windows Users:** Windows Defender SmartScreen may flag the pre-compiled executable as it is not digitally signed. The application is safe, and its source code is open for audit. To run it, click "More info" on the SmartScreen prompt, followed by "Run anyway".
+> **Note for Windows Users:** Windows Defender SmartScreen may flag the pre-compiled executable as it is not digitally signed. The application is safe, and its source code is open for audit. To run it, click "More info" on the SmartScreen prompt, followed by "Run anyway". Additionally, for the performance metrics (like CPU usage) to appear correctly, you may need to run the application with administrative privileges. Right-click `HardStress.exe` and select 'Run as administrator'.
 </details>
 
 ---
