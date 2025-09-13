@@ -9,6 +9,11 @@
 #include "hardstress.h"
 #include "ui.h" // Required for create_main_window
 
+#ifdef _WIN32
+#include <windows.h>
+#include <stdio.h>
+#endif
+
 // Define the global colors that were declared in the header.
 const color_t COLOR_BG = {0.12, 0.12, 0.12};
 const color_t COLOR_FG = {0.15, 0.65, 0.90};
@@ -36,6 +41,13 @@ const color_t COLOR_TEMP = {1.0, 1.0, 0.8};
  * @return 0 on successful execution, 1 on failure.
  */
 int main(int argc, char **argv){
+#ifdef _WIN32
+    // Allocate a console for debugging purposes
+    AllocConsole();
+    // Redirect stdout and stderr to the new console
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);
+#endif
     gtk_init(&argc, &argv);
     
     // Allocate and zero out the main application structure
