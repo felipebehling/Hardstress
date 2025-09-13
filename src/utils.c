@@ -23,7 +23,7 @@ uint64_t splitmix64(uint64_t *x){
 }
 
 void shuffle32(uint32_t *a, size_t n, uint64_t *seed){
-    if (n <= 1) return;
+    if (a == NULL || n <= 1) return;
     for (size_t i = n - 1; i > 0; --i){
         size_t j = (size_t)(splitmix64(seed) % (i + 1));
         uint32_t tmp = a[i]; a[i] = a[j]; a[j] = tmp;
